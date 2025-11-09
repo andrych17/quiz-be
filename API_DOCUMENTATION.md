@@ -142,7 +142,7 @@ NODE_ENV=development
 
 # JWT Configuration
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
-JWT_EXPIRES_IN=24h
+JWT_EXPIRES_IN=7d
 JWT_REFRESH_EXPIRES_IN=7d
 
 # URLs (for CORS)
@@ -162,6 +162,76 @@ SESSION_CLEANUP_BATCH_SIZE=100
 BCRYPT_ROUNDS=10
 ```
 
+## 🔐 JWT Security Configuration
+
+### JWT Token Expiration Policy
+
+The application uses JWT (JSON Web Tokens) for authentication with the following security policies:
+
+**Token Lifetimes:**
+- **Access Token**: 7 days (604,800 seconds)
+- **Refresh Token**: 7 days (604,800 seconds)
+
+**Security Features:**
+- ✅ **Automatic Expiration**: Tokens automatically expire after 7 days
+- ✅ **Forced Invalidation**: Expired tokens are rejected by the server
+- ✅ **Secure Storage**: Tokens should be stored securely (localStorage + httpOnly cookies recommended)
+- ✅ **Role-Based Access**: Tokens contain user role information for authorization
+
+**Token Validation:**
+```javascript
+// Token expiration is automatically handled by the JWT library
+// When a token expires, the server returns:
+{
+  "success": false,
+  "message": "Token has expired",
+  "statusCode": 401,
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/protected-endpoint"
+}
+```
+
+**Frontend Token Management:**
+```javascript
+// Check if token is expired before making requests
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  
+  try {
+    const decoded = jwt.decode(token);
+    const currentTime = Date.now() / 1000;
+    return decoded.exp < currentTime;
+  } catch (error) {
+    return true;
+  }
+};
+
+// Handle expired tokens
+const handleExpiredToken = () => {
+  localStorage.removeItem('access_token');
+  // Redirect to login page
+  window.location.href = '/login';
+};
+```
+
+**Best Practices:**
+1. **Store tokens securely** - Use httpOnly cookies when possible
+2. **Check expiration client-side** - Validate before making API calls
+3. **Handle 401 responses** - Automatically redirect to login on token expiration
+4. **Use refresh tokens** - Implement token refresh flow for better UX
+5. **Clear tokens on logout** - Remove from all storage locations
+
+**Token Payload Structure:**
+```json
+{
+  "sub": 1,           // User ID
+  "email": "user@example.com",
+  "role": "admin",    // User role for authorization
+  "iat": 1731234567,  // Issued at timestamp
+  "exp": 1731839367   // Expiration timestamp (7 days from issue)
+}
+```
+
 ## API Endpoints
 
 ### Authentication Endpoints
@@ -169,6 +239,7 @@ BCRYPT_ROUNDS=10
 - `POST /api/auth/register` - User registration  
 - `POST /api/auth/refresh` - Refresh JWT token
 - `GET /api/auth/profile` - Get user profile
+- `PUT /api/auth/profile` - Update user profile (name, email, password)
 - `POST /api/auth/change-password` - Change user password
 - `POST /api/auth/logout` - User logout
 
@@ -1506,6 +1577,219 @@ export const useAuth = () => {
     isUser: user?.role === 'user'
   };
 };
+
+// Profile Management Component
+const ProfileManager: React.FC = () => {
+  const { user } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.name,
+        email: user.email
+      }));
+    }
+  }, [user]);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const updateData: any = {};
+
+      // Update name if changed
+      if (formData.name !== user?.name) {
+        updateData.name = formData.name;
+      }
+
+      // Update email if changed
+      if (formData.email !== user?.email) {
+        if (!formData.currentPassword) {
+          alert('Current password is required when updating email');
+          return;
+        }
+        updateData.email = formData.email;
+        updateData.currentPassword = formData.currentPassword;
+      }
+
+      // Update password if provided
+      if (formData.newPassword) {
+        if (!formData.currentPassword) {
+          alert('Current password is required when updating password');
+          return;
+        }
+        if (formData.newPassword !== formData.confirmPassword) {
+          alert('New passwords do not match');
+          return;
+        }
+        updateData.newPassword = formData.newPassword;
+        updateData.currentPassword = formData.currentPassword;
+      }
+
+      const response = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('Profile updated successfully');
+        setIsEditing(false);
+        // Clear password fields
+        setFormData(prev => ({
+          ...prev,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        }));
+        // Refresh page to update user data
+        window.location.reload();
+      } else {
+        alert(`Error: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!user) {
+    return <div>Loading profile...</div>;
+  }
+
+  return (
+    <div className="profile-manager">
+      <div className="profile-header">
+        <h2>My Profile</h2>
+        <button 
+          onClick={() => setIsEditing(!isEditing)}
+          className={`toggle-edit-btn ${isEditing ? 'cancel' : 'edit'}`}
+        >
+          {isEditing ? 'Cancel' : 'Edit Profile'}
+        </button>
+      </div>
+
+      {!isEditing ? (
+        <div className="profile-display">
+          <div className="profile-field">
+            <strong>Name:</strong> {user.name}
+          </div>
+          <div className="profile-field">
+            <strong>Email:</strong> {user.email}
+          </div>
+          <div className="profile-field">
+            <strong>Role:</strong> {user.role}
+          </div>
+          <div className="profile-field">
+            <strong>Last Login:</strong> {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleUpdateProfile} className="profile-edit-form">
+          <div className="form-group">
+            <label htmlFor="name">Full Name</label>
+            <input
+              type="text"
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="email">Email Address</label>
+            <input
+              type="email"
+              id="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              required
+            />
+            {formData.email !== user.email && (
+              <small className="form-hint">Current password required to change email</small>
+            )}
+          </div>
+
+          <div className="password-section">
+            <h4>Change Password (Optional)</h4>
+            
+            <div className="form-group">
+              <label htmlFor="currentPassword">Current Password</label>
+              <input
+                type="password"
+                id="currentPassword"
+                value={formData.currentPassword}
+                onChange={(e) => setFormData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                placeholder={formData.email !== user.email || formData.newPassword ? "Required" : "Optional"}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="newPassword">New Password</label>
+              <input
+                type="password"
+                id="newPassword"
+                value={formData.newPassword}
+                onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
+                minLength={6}
+                placeholder="Leave empty to keep current password"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="confirmPassword">Confirm New Password</label>
+              <input
+                type="password"
+                id="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                minLength={6}
+                placeholder="Confirm new password"
+                disabled={!formData.newPassword}
+              />
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="save-btn"
+            >
+              {loading ? 'Updating...' : 'Save Changes'}
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setIsEditing(false)}
+              className="cancel-btn"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+};
 ```
 
 ### Environment Configuration
@@ -1614,7 +1898,7 @@ POST /api/auth/login
   "data": {
     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "token_type": "Bearer",
-    "expires_in": 86400,
+    "expires_in": 604800,
     "user": {
       "id": 1,
       "name": "Super Administrator",
@@ -1658,6 +1942,191 @@ POST /api/auth/login
   ],
   "timestamp": "2025-11-10T10:30:00.000Z",
   "path": "/api/auth/register",
+  "statusCode": 400
+}
+```
+
+#### Get Profile Success
+```json
+GET /api/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "success": true,
+  "message": "Profile retrieved successfully",
+  "data": {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "admin",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2025-11-10T10:30:00.000Z",
+    "lastLogin": "2025-11-10T09:15:00.000Z"
+  },
+  "metadata": {
+    "duration": 45
+  },
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Update Profile - Name Only
+```json
+PUT /api/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "name": "John Smith"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "id": 1,
+    "name": "John Smith",
+    "email": "john@example.com",
+    "role": "admin",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2025-11-10T10:35:00.000Z"
+  },
+  "metadata": {
+    "duration": 123
+  },
+  "timestamp": "2025-11-10T10:35:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Update Profile - Email Change
+```json
+PUT /api/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "email": "john.smith@example.com",
+  "currentPassword": "currentpassword123"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "id": 1,
+    "name": "John Smith",
+    "email": "john.smith@example.com",
+    "role": "admin",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2025-11-10T10:40:00.000Z"
+  },
+  "metadata": {
+    "duration": 156
+  },
+  "timestamp": "2025-11-10T10:40:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Update Profile - Password Change
+```json
+PUT /api/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "currentPassword": "currentpassword123",
+  "newPassword": "newstrongpassword456"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "id": 1,
+    "name": "John Smith",
+    "email": "john.smith@example.com",
+    "role": "admin",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2025-11-10T10:45:00.000Z"
+  },
+  "metadata": {
+    "duration": 234
+  },
+  "timestamp": "2025-11-10T10:45:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Update Profile - Combined Changes
+```json
+PUT /api/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "name": "John A. Smith",
+  "email": "john.a.smith@example.com",
+  "currentPassword": "currentpassword123",
+  "newPassword": "newsecurepassword789"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "id": 1,
+    "name": "John A. Smith",
+    "email": "john.a.smith@example.com",
+    "role": "admin",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2025-11-10T10:50:00.000Z"
+  },
+  "metadata": {
+    "duration": 287
+  },
+  "timestamp": "2025-11-10T10:50:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Update Profile Errors
+
+##### Missing Current Password
+```json
+{
+  "success": false,
+  "message": "Current password is required when updating email",
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/auth/profile",
+  "statusCode": 400
+}
+```
+
+##### Incorrect Current Password
+```json
+{
+  "success": false,
+  "message": "Current password is incorrect",
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/auth/profile",
+  "statusCode": 400
+}
+```
+
+##### Email Already Exists
+```json
+{
+  "success": false,
+  "message": "Email already exists",
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/auth/profile",
   "statusCode": 400
 }
 ```

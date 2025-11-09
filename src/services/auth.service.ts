@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from './user.service';
-import { LoginDto, RegisterDto, AuthResponseDto, ChangePasswordDto } from '../dto/auth.dto';
+import { LoginDto, RegisterDto, AuthResponseDto, ChangePasswordDto, UpdateProfileDto } from '../dto/auth.dto';
 import { CreateUserDto, UserRole } from '../dto/user.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import * as bcrypt from 'bcrypt';
@@ -50,7 +50,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
-    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '24h';
+    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
 
     return {
       access_token: accessToken,
@@ -91,7 +91,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
-    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '24h';
+    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
 
     return {
       access_token: accessToken,
@@ -122,7 +122,7 @@ export class AuthService {
       };
 
       const accessToken = this.jwtService.sign(newPayload);
-      const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '24h';
+      const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
 
       return {
         access_token: accessToken,
@@ -177,6 +177,76 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async updateProfile(userId: number, updateProfileDto: UpdateProfileDto): Promise<any> {
+    const user = await this.userService.findByEmail(
+      (await this.userService.findOne(userId)).email
+    );
+    
+    if (!user) {
+      throw new UnauthorizedException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    const updateData: any = {};
+
+    // Update name if provided
+    if (updateProfileDto.name) {
+      updateData.name = updateProfileDto.name;
+    }
+
+    // Update email if provided
+    if (updateProfileDto.email) {
+      // Verify current password if changing email
+      if (!updateProfileDto.currentPassword) {
+        throw new BadRequestException('Current password is required when updating email');
+      }
+
+      const isPasswordValid = await bcrypt.compare(
+        updateProfileDto.currentPassword, 
+        user.password
+      );
+
+      if (!isPasswordValid) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+
+      // Check if new email already exists
+      const existingUser = await this.userService.findByEmail(updateProfileDto.email);
+      if (existingUser && existingUser.id !== userId) {
+        throw new BadRequestException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
+      }
+
+      updateData.email = updateProfileDto.email;
+    }
+
+    // Update password if provided
+    if (updateProfileDto.newPassword) {
+      // Verify current password
+      if (!updateProfileDto.currentPassword) {
+        throw new BadRequestException('Current password is required when updating password');
+      }
+
+      const isPasswordValid = await bcrypt.compare(
+        updateProfileDto.currentPassword, 
+        user.password
+      );
+
+      if (!isPasswordValid) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+
+      updateData.password = updateProfileDto.newPassword;
+    }
+
+    // Update user profile
+    if (Object.keys(updateData).length > 0) {
+      await this.userService.update(userId, updateData);
+    }
+
+    // Return updated user profile
+    const updatedUser = await this.userService.findOne(userId);
+    return updatedUser;
   }
 
   private async updateLastLogin(userId: number): Promise<void> {

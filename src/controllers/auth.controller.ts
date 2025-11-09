@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Put,
   Body,
   UseGuards,
   Request,
@@ -22,7 +23,8 @@ import {
   RegisterDto, 
   AuthResponseDto, 
   RefreshTokenDto, 
-  ChangePasswordDto 
+  ChangePasswordDto,
+  UpdateProfileDto 
 } from '../dto/auth.dto';
 import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
 
@@ -96,6 +98,31 @@ export class AuthController {
   async getProfile(@Request() req: any): Promise<StdApiResponse<any>> {
     const result = await this.authService.getProfile(req.user.id);
     return ResponseFactory.success(result, 'Profile retrieved successfully');
+  }
+
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user profile' })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Profile updated successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid data or current password is incorrect',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized access',
+  })
+  async updateProfile(
+    @Request() req: any,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ): Promise<StdApiResponse<any>> {
+    const result = await this.authService.updateProfile(req.user.id, updateProfileDto);
+    return ResponseFactory.success(result, 'Profile updated successfully');
   }
 
   @Post('change-password')

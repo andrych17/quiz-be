@@ -103,3 +103,37 @@ export class ChangePasswordDto {
   @MinLength(6)
   newPassword: string;
 }
+
+export class UpdateProfileDto {
+  @ApiProperty({ 
+    example: 'John Doe Updated', 
+    description: 'Updated full name',
+    required: false 
+  })
+  @IsString()
+  name?: string;
+
+  @ApiProperty({ 
+    example: 'newemail@example.com', 
+    description: 'Updated email address',
+    required: false 
+  })
+  @IsEmail()
+  email?: string;
+
+  @ApiProperty({ 
+    example: 'currentpassword123', 
+    description: 'Current password (required when updating email or password)',
+    required: false 
+  })
+  @IsString()
+  currentPassword?: string;
+
+  @ApiProperty({ 
+    example: 'newpassword123', 
+    description: 'New password (min 6 characters)',
+    required: false 
+  })
+  @MinLength(6)
+  newPassword?: string;
+}
