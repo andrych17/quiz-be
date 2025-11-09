@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserLocation, QuizImage } from '../entities';
+import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserQuizAssignment, QuizImage } from '../entities';
 import { ServiceType } from '../dto/quiz.dto';
 
 export class DatabaseSeeder {
@@ -13,7 +13,7 @@ export class DatabaseSeeder {
     await this.seedConfigItems();
     await this.seedQuizzes();
     await this.seedAttempts();
-    await this.seedUserLocations();
+    // await this.seedUserLocations(); // Deprecated: Using UserQuizAssignment now
 
     console.log('Database seeding completed!');
   }
@@ -192,6 +192,8 @@ export class DatabaseSeeder {
     console.log(`✓ Seeded ${configs.length} config items`);
   }
 
+  /* 
+  // DEPRECATED: User locations system replaced with UserQuizAssignment
   private async seedUserLocations(): Promise<void> {
     const userLocationRepository = this.dataSource.getRepository(UserLocation);
     const userRepository = this.dataSource.getRepository(User);
@@ -237,6 +239,7 @@ export class DatabaseSeeder {
     await userLocationRepository.save(userLocations);
     console.log(`✓ Seeded ${userLocations.length} user locations`);
   }
+  */
 
   private async seedQuizzes(): Promise<void> {
     const quizRepository = this.dataSource.getRepository(Quiz);

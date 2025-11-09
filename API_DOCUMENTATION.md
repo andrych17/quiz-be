@@ -5,6 +5,58 @@
 - **API Base URL**: http://localhost:3001/api
 - **Swagger Documentation**: http://localhost:3001/api/docs
 
+## 🔐 Authorization System Overview
+
+The Quiz App has been updated with a comprehensive role-based authorization system:
+
+### User Roles
+1. **Superadmin**: Full system access, can manage all quizzes and user assignments
+2. **Admin**: Limited access to assigned quizzes only
+3. **User**: Can take published quizzes (requires authentication)
+4. **External Participants**: Can only access published quizzes via short URLs (no authentication required)
+
+### Authorization Changes
+- **Location-based access** has been replaced with **direct quiz assignments**
+- Admins are now assigned to specific quizzes via UserQuizAssignment entities
+- Superadmins can access all data and manage quiz assignments
+- All quiz endpoints now filter results based on user role and assignments
+- **External participants** can access published quizzes via public short URLs without any authentication
+
+### Migration Summary (November 2025)
+
+#### What Changed:
+1. **Removed**: `user_locations` table and related endpoints
+2. **Added**: `user_quiz_assignments` table with many-to-many User-Quiz relationships  
+3. **Updated**: User entity with `superadmin` role
+4. **Enhanced**: All quiz endpoints with role-based filtering
+5. **New**: User Quiz Assignment management endpoints for superadmins
+
+#### Data Migration:
+- Existing admin-location assignments were automatically converted to admin-quiz assignments
+- All quizzes in a location are now directly assigned to admins who had access to that location
+- No data loss during migration - assignments are preserved but more granular
+
+#### Breaking Changes:
+- User Location endpoints (`/api/user-locations/*`) are no longer available
+- Quiz endpoints now require authentication and filter by user role
+- Admin users can only see quizzes they are specifically assigned to
+- Location-based quiz filtering has been replaced with assignment-based filtering
+
+#### New Capabilities:
+- Superadmins can assign specific admins to specific quizzes
+- More granular access control (admin can access Quiz A but not Quiz B in the same location)
+- Better audit trail with assignment tracking
+- Scalable for multiple admins per quiz and multiple quizzes per admin
+- **Public quiz access** for external participants via short URLs
+
+#### External Participant Access:
+- **No Registration Required**: External participants don't need to create accounts
+- **No Authentication**: Access quizzes directly via short URLs (tokens)
+- **Published Quizzes Only**: Can only access quizzes that are published (`isPublished: true`)
+- **Time-based Access**: For scheduled quizzes, access is only available during the scheduled time window
+- **Manual Quiz Access**: For manual quizzes, access is available once admin starts the quiz
+- **Secure Tokens**: Each quiz has a unique token for secure public access
+
 ## 🚀 Standardized Response Format
 
 All API responses follow a consistent structure for better frontend integration and error handling:
@@ -121,18 +173,26 @@ BCRYPT_ROUNDS=10
 - `POST /api/auth/logout` - User logout
 
 ### User Management
-- `POST /api/users` - Create user
-- `GET /api/users` - Get all users
-- `GET /api/users/:id` - Get user by ID
-- `PUT /api/users/:id` - Update user
-- `DELETE /api/users/:id` - Delete user
+- `POST /api/users` - Create user *(superadmin only)*
+- `GET /api/users` - Get all users *(superadmin only)*
+- `GET /api/users/:id` - Get user by ID *(superadmin/admin)*
+- `PUT /api/users/:id` - Update user *(superadmin only)*
+- `DELETE /api/users/:id` - Delete user *(superadmin only)*
 
-### Quiz Management
-- `POST /api/quizzes` - Create quiz
-- `GET /api/quizzes` - Get all quizzes
-- `GET /api/quizzes/:id` - Get quiz by ID
-- `PUT /api/quizzes/:id` - Update quiz
-- `DELETE /api/quizzes/:id` - Delete quiz
+### User Quiz Assignment Management *(superadmin only)*
+- `POST /api/user-quiz-assignments` - Assign admin to quiz
+- `GET /api/user-quiz-assignments` - Get all user-quiz assignments
+- `GET /api/user-quiz-assignments/user/:userId/quizzes` - Get quizzes assigned to user
+- `GET /api/user-quiz-assignments/quiz/:quizId/users` - Get users assigned to quiz
+- `DELETE /api/user-quiz-assignments/:id` - Remove user-quiz assignment
+
+### Quiz Management *(role-based filtering)*
+- `POST /api/quizzes` - Create quiz *(admin/superadmin)*
+- `GET /api/quizzes` - Get quizzes *(filtered by role: superadmin sees all, admin sees assigned only)*
+- `GET /api/quizzes/:id` - Get quiz by ID *(role-based access)*
+- `PUT /api/quizzes/:id` - Update quiz *(admin/superadmin, must have access)*
+- `DELETE /api/quizzes/:id` - Delete quiz *(admin/superadmin, must have access)*
+- `GET /api/quizzes/public/:token` - Get published quiz by token *(public access, no authentication required)*
 - `GET /api/quizzes/:id/questions` - Get quiz questions
 - `GET /api/quizzes/:id/attempts` - Get quiz attempts
 - `POST /api/quizzes/:id/duplicate` - Duplicate quiz
@@ -171,18 +231,6 @@ BCRYPT_ROUNDS=10
 - `PATCH /api/attempt-answers/:id` - Update attempt answer
 - `DELETE /api/attempt-answers/:id` - Delete attempt answer
 - `GET /api/attempt-answers/attempt/:attemptId/correct-count` - Get correct answers count
-
-### User Location Management
-- `POST /api/user-locations` - Create user location assignment
-- `GET /api/user-locations` - Get all user locations
-- `GET /api/user-locations/user/:userId` - Get locations by user
-- `GET /api/user-locations/location/:locationId` - Get users by location
-- `GET /api/user-locations/location/:locationId/active` - Get active users by location
-- `GET /api/user-locations/users/without-location` - Get users without location
-- `GET /api/user-locations/:id` - Get user location by ID
-- `PATCH /api/user-locations/:id` - Update user location
-- `DELETE /api/user-locations/:id` - Delete user location
-- `POST /api/user-locations/assign` - Assign user to location
 
 ### Quiz Image Management (Integrated with Quiz Management)
 - `POST /api/quizzes/:id/images` - Associate uploaded image with quiz
@@ -967,6 +1015,499 @@ const QuizTypeManager: React.FC = () => {
 };
 ```
 
+### User Quiz Assignment Management Components
+
+```typescript
+import React, { useState, useEffect } from 'react';
+
+// User Quiz Assignment Manager (Superadmin Only)
+const UserQuizAssignmentManager: React.FC = () => {
+  const [assignments, setAssignments] = useState<UserQuizAssignment[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [selectedUser, setSelectedUser] = useState<number | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const api = new ApiClient();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [assignmentsRes, usersRes, quizzesRes] = await Promise.all([
+        api.get('/user-quiz-assignments'),
+        api.get('/users'),
+        api.get('/quizzes')
+      ]);
+
+      if (assignmentsRes.success) setAssignments(assignmentsRes.data.items);
+      if (usersRes.success) setUsers(usersRes.data.items.filter(u => u.role === 'admin'));
+      if (quizzesRes.success) setQuizzes(quizzesRes.data.items || quizzesRes.data);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createAssignment = async () => {
+    if (!selectedUser || !selectedQuiz) return;
+
+    try {
+      const response = await api.post('/user-quiz-assignments', {
+        userId: selectedUser,
+        quizId: selectedQuiz,
+        isActive: true
+      });
+
+      if (response.success) {
+        setAssignments([...assignments, response.data]);
+        setSelectedUser(null);
+        setSelectedQuiz(null);
+        alert('Assignment created successfully');
+      }
+    } catch (error) {
+      console.error('Error creating assignment:', error);
+      alert('Failed to create assignment');
+    }
+  };
+
+  const removeAssignment = async (assignmentId: number) => {
+    if (!confirm('Are you sure you want to remove this assignment?')) return;
+
+    try {
+      const response = await api.delete(`/user-quiz-assignments/${assignmentId}`);
+      
+      if (response.success) {
+        setAssignments(assignments.filter(a => a.id !== assignmentId));
+        alert('Assignment removed successfully');
+      }
+    } catch (error) {
+      console.error('Error removing assignment:', error);
+      alert('Failed to remove assignment');
+    }
+  };
+
+  const getUserAssignedQuizzes = async (userId: number) => {
+    try {
+      const response = await api.get(`/user-quiz-assignments/user/${userId}/quizzes`);
+      if (response.success) {
+        console.log(`User ${userId} assigned quizzes:`, response.data.items);
+      }
+    } catch (error) {
+      console.error('Error fetching user quizzes:', error);
+    }
+  };
+
+  if (loading) return <div className="loading">Loading...</div>;
+
+  return (
+    <div className="assignment-manager">
+      <h2>User Quiz Assignment Management</h2>
+      
+      {/* Create New Assignment */}
+      <div className="create-assignment">
+        <h3>Create New Assignment</h3>
+        <div className="form-row">
+          <select 
+            value={selectedUser || ''} 
+            onChange={(e) => setSelectedUser(Number(e.target.value))}
+          >
+            <option value="">Select Admin User</option>
+            {users.map(user => (
+              <option key={user.id} value={user.id}>
+                {user.name} ({user.email})
+              </option>
+            ))}
+          </select>
+          
+          <select 
+            value={selectedQuiz || ''} 
+            onChange={(e) => setSelectedQuiz(Number(e.target.value))}
+          >
+            <option value="">Select Quiz</option>
+            {quizzes.map(quiz => (
+              <option key={quiz.id} value={quiz.id}>
+                {quiz.title} ({quiz.serviceType})
+              </option>
+            ))}
+          </select>
+          
+          <button 
+            onClick={createAssignment}
+            disabled={!selectedUser || !selectedQuiz}
+          >
+            Create Assignment
+          </button>
+        </div>
+      </div>
+
+      {/* Existing Assignments */}
+      <div className="assignments-list">
+        <h3>Current Assignments ({assignments.length})</h3>
+        {assignments.length === 0 ? (
+          <p>No assignments found</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Admin User</th>
+                <th>Quiz</th>
+                <th>Service Type</th>
+                <th>Assigned Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignments.map(assignment => (
+                <tr key={assignment.id}>
+                  <td>
+                    <div>
+                      <strong>{assignment.user?.name}</strong>
+                      <br />
+                      <small>{assignment.user?.email}</small>
+                    </div>
+                  </td>
+                  <td>{assignment.quiz?.title}</td>
+                  <td>{assignment.quiz?.serviceType}</td>
+                  <td>{new Date(assignment.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <span className={`status ${assignment.isActive ? 'active' : 'inactive'}`}>
+                      {assignment.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      onClick={() => getUserAssignedQuizzes(assignment.userId)}
+                      className="view-btn"
+                    >
+                      View All
+                    </button>
+                    <button 
+                      onClick={() => removeAssignment(assignment.id)}
+                      className="remove-btn"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Role-based Quiz List Component
+const RoleBasedQuizList: React.FC = () => {
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const api = new ApiClient();
+
+  useEffect(() => {
+    loadQuizzesForCurrentUser();
+  }, []);
+
+  const loadQuizzesForCurrentUser = async () => {
+    try {
+      // Get current user from auth context or token
+      const userResponse = await api.get('/auth/profile');
+      if (userResponse.success) {
+        setUser(userResponse.data);
+      }
+
+      // Fetch quizzes (automatically filtered by backend based on user role)
+      const quizzesResponse = await api.get('/quizzes');
+      if (quizzesResponse.success) {
+        setQuizzes(quizzesResponse.data.items || quizzesResponse.data);
+      }
+    } catch (error) {
+      console.error('Error loading quizzes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRoleMessage = () => {
+    switch (user?.role) {
+      case 'superadmin':
+        return 'Viewing all quizzes (Superadmin access)';
+      case 'admin':
+        return 'Viewing assigned quizzes only (Admin access)';
+      case 'user':
+        return 'Viewing published quizzes (User access)';
+      default:
+        return 'Loading...';
+    }
+  };
+
+  if (loading) return <div className="loading">Loading quizzes...</div>;
+
+  return (
+    <div className="role-based-quiz-list">
+      <div className="header">
+        <h2>Quiz Dashboard</h2>
+        <p className="role-info">{getRoleMessage()}</p>
+        <div className="user-info">
+          Logged in as: <strong>{user?.name}</strong> ({user?.role})
+        </div>
+      </div>
+
+      <div className="quizzes-grid">
+        {quizzes.length === 0 ? (
+          <div className="no-quizzes">
+            {user?.role === 'admin' 
+              ? 'No quizzes assigned to you' 
+              : 'No quizzes available'
+            }
+          </div>
+        ) : (
+          quizzes.map(quiz => (
+            <div key={quiz.id} className="quiz-card">
+              <h3>{quiz.title}</h3>
+              <p>{quiz.description}</p>
+              <div className="quiz-meta">
+                <span className="service-type">{quiz.serviceType}</span>
+                <span className="quiz-type">{quiz.quizType}</span>
+                <span className={`status ${quiz.isPublished ? 'published' : 'draft'}`}>
+                  {quiz.isPublished ? 'Published' : 'Draft'}
+                </span>
+              </div>
+              
+              <div className="quiz-actions">
+                {user?.role !== 'user' && (
+                  <button onClick={() => window.open(`/admin/quiz/${quiz.id}`)}>
+                    Manage
+                  </button>
+                )}
+                
+                {quiz.isPublished && (
+                  <button onClick={() => window.open(`/quiz/${quiz.token}`)}>
+                    Take Quiz
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Public Quiz Access Component (for External Participants)
+const PublicQuizAccess: React.FC<{ token: string }> = ({ token }) => {
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadPublicQuiz();
+  }, [token]);
+
+  const loadPublicQuiz = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Public API call - no authentication required
+      const response = await fetch(`/api/quizzes/public/${token}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setQuiz(result.data);
+      } else {
+        setError(result.message);
+      }
+    } catch (error) {
+      console.error('Error loading public quiz:', error);
+      setError('Unable to load quiz. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Loading quiz...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <h2>Quiz Access Error</h2>
+        <p>{error}</p>
+        <div className="error-actions">
+          <button onClick={loadPublicQuiz}>Try Again</button>
+          <button onClick={() => window.location.href = '/'}>Go Home</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <div className="not-found">
+        <h2>Quiz Not Found</h2>
+        <p>The quiz you're looking for is not available or has been removed.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="public-quiz-container">
+      <div className="quiz-header">
+        <h1>{quiz.title}</h1>
+        <p className="quiz-description">{quiz.description}</p>
+        
+        <div className="quiz-info">
+          <div className="info-item">
+            <strong>Duration:</strong> {quiz.durationMinutes} minutes
+          </div>
+          <div className="info-item">
+            <strong>Questions:</strong> {quiz.questions?.length || 0}
+          </div>
+          <div className="info-item">
+            <strong>Passing Score:</strong> {quiz.passingScore}%
+          </div>
+          
+          {quiz.quizType === 'scheduled' && quiz.startDateTime && quiz.endDateTime && (
+            <>
+              <div className="info-item">
+                <strong>Available:</strong> {new Date(quiz.startDateTime).toLocaleString()} - {new Date(quiz.endDateTime).toLocaleString()}
+              </div>
+            </>
+          )}
+        </div>
+
+        {quiz.images && quiz.images.length > 0 && (
+          <div className="quiz-images">
+            {quiz.images.map(image => (
+              <img
+                key={image.id}
+                src={image.fullUrl}
+                alt={image.altText || quiz.title}
+                className="quiz-banner"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="quiz-actions">
+        <button 
+          className="start-quiz-btn primary"
+          onClick={() => {
+            // Start quiz session for external participant
+            window.location.href = `/quiz/take/${quiz.token}`;
+          }}
+        >
+          Start Quiz
+        </button>
+        
+        <div className="quiz-notice">
+          <p>⚠️ <strong>Note:</strong> You don't need to register or login to take this quiz.</p>
+          <p>📝 Your progress will be tracked by your session. Make sure to complete the quiz in one session.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Usage example for public quiz page
+// URL: /quiz/{token}
+const PublicQuizPage: React.FC = () => {
+  const { token } = useParams<{ token: string }>();
+
+  if (!token) {
+    return (
+      <div className="error-container">
+        <h2>Invalid Quiz Link</h2>
+        <p>The quiz link appears to be invalid or incomplete.</p>
+      </div>
+    );
+  }
+
+  return <PublicQuizAccess token={token} />;
+};
+
+// Authorization Hook
+export const useAuth = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      // Decode token or fetch user profile
+      fetchUserProfile();
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const api = new ApiClient();
+      const response = await api.get('/auth/profile');
+      if (response.success) {
+        setUser(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      localStorage.removeItem('access_token');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hasRole = (roles: string[]) => {
+    return user && roles.includes(user.role);
+  };
+
+  const canAccessAllQuizzes = () => {
+    return user?.role === 'superadmin';
+  };
+
+  const canManageAssignments = () => {
+    return user?.role === 'superadmin';
+  };
+
+  return {
+    user,
+    loading,
+    hasRole,
+    canAccessAllQuizzes,
+    canManageAssignments,
+    isSuperadmin: user?.role === 'superadmin',
+    isAdmin: user?.role === 'admin',
+    isUser: user?.role === 'user'
+  };
+};
+```
+
 ### Environment Configuration
 
 ```bash
@@ -1076,9 +1617,9 @@ POST /api/auth/login
     "expires_in": 86400,
     "user": {
       "id": 1,
-      "name": "John Doe",
-      "email": "john@gms.com",
-      "role": "user"
+      "name": "Super Administrator",
+      "email": "superadmin@gms.com",
+      "role": "superadmin"
     }
   },
   "metadata": {
@@ -1205,9 +1746,13 @@ GET /api/users/999
 
 ### Quiz Management Responses
 
-#### Get All Quizzes
+#### Get All Quizzes (Role-Based Filtering)
 ```json
 GET /api/quizzes
+// Note: Results are filtered by user role:
+// - Superadmin: sees all quizzes
+// - Admin: sees only assigned quizzes
+// - User: sees only published quizzes
 {
   "success": true,
   "message": "Data retrieved successfully",
@@ -1385,6 +1930,104 @@ GET /api/quizzes/1/template-preview
     }
   },
   "statusCode": 200
+}
+```
+
+#### Public Quiz Access (External Participants)
+```json
+GET /api/quizzes/public/JS_QUIZ_2024_TOKEN
+// No authentication required - public access via token
+{
+  "success": true,
+  "message": "Quiz retrieved successfully",
+  "data": {
+    "id": 1,
+    "title": "JavaScript Fundamentals Quiz",
+    "description": "Test your JavaScript knowledge",
+    "token": "JS_QUIZ_2024_TOKEN",
+    "serviceType": "web-development",
+    "quizType": "scheduled",
+    "startDateTime": "2025-11-10T09:00:00.000Z",
+    "endDateTime": "2025-11-10T17:00:00.000Z",
+    "durationMinutes": 120,
+    "passingScore": 70,
+    "questionsPerPage": 5,
+    "isActive": true,
+    "isPublished": true,
+    "questions": [
+      {
+        "id": 1,
+        "questionText": "What is a closure in JavaScript?",
+        "questionType": "multiple-choice",
+        "options": [
+          "A function inside another function",
+          "A way to close the browser",
+          "A variable declaration",
+          "None of the above"
+        ],
+        "correctAnswer": "A function inside another function",
+        "points": 10
+      }
+    ],
+    "images": [
+      {
+        "id": 1,
+        "fileName": "js-concepts.png",
+        "fullUrl": "http://localhost:8080/uploads/quiz-images/js-concepts.png",
+        "altText": "JavaScript concepts diagram"
+      }
+    ],
+    "scoringTemplates": [
+      {
+        "id": 1,
+        "scoringName": "Standard Scoring",
+        "correctAnswerPoints": 10,
+        "incorrectAnswerPenalty": 0,
+        "multiplier": 1.0
+      }
+    ]
+  },
+  "metadata": {
+    "duration": 45
+  },
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "statusCode": 200
+}
+```
+
+#### Public Quiz Access - Quiz Not Published
+```json
+GET /api/quizzes/public/DRAFT_QUIZ_TOKEN
+{
+  "success": false,
+  "message": "Quiz not found or not published for public access",
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/quizzes/public/DRAFT_QUIZ_TOKEN",
+  "statusCode": 404
+}
+```
+
+#### Public Quiz Access - Quiz Not Started Yet
+```json
+GET /api/quizzes/public/FUTURE_QUIZ_TOKEN
+{
+  "success": false,
+  "message": "Quiz has not started yet",
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/quizzes/public/FUTURE_QUIZ_TOKEN",
+  "statusCode": 400
+}
+```
+
+#### Public Quiz Access - Quiz Already Ended
+```json
+GET /api/quizzes/public/EXPIRED_QUIZ_TOKEN
+{
+  "success": false,
+  "message": "Quiz has already ended",
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/quizzes/public/EXPIRED_QUIZ_TOKEN",
+  "statusCode": 400
 }
 ```
 

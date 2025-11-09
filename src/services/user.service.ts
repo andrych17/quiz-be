@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
-import { UserLocation } from '../entities/user-location.entity';
+import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
 import { ConfigItem } from '../entities/config-item.entity';
 import { CreateUserDto, UpdateUserDto, UserResponseDto, UserRole } from '../dto/user.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, DEFAULTS } from '../constants';
@@ -14,8 +14,8 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
-    @InjectRepository(UserLocation)
-    private userLocationRepository: Repository<UserLocation>,
+    @InjectRepository(UserQuizAssignment)
+    private userQuizAssignmentRepository: Repository<UserQuizAssignment>,
     @InjectRepository(ConfigItem)
     private configItemRepository: Repository<ConfigItem>,
   ) {}
@@ -49,13 +49,14 @@ export class UserService {
           where: { id: createUserDto.locationId, group: 'location' },
         });
 
-        if (location) {
-          const userLocation = this.userLocationRepository.create({
-            userId: savedUser.id,
-            locationId: createUserDto.locationId,
-          });
-          await this.userLocationRepository.save(userLocation);
-        }
+        // Location assignment now handled via UserQuizAssignment system
+        // if (location) {
+        //   const userLocation = this.userLocationRepository.create({
+        //     userId: savedUser.id,
+        //     locationId: createUserDto.locationId,
+        //   });
+        //   await this.userLocationRepository.save(userLocation);
+        // }
       }
 
       // Return user without password
@@ -146,26 +147,26 @@ export class UserService {
     
     await this.userRepository.update(id, updateData);
 
-    // Update location if provided
-    if (updateUserDto.locationId !== undefined) {
-      // Remove existing location
-      await this.userLocationRepository.delete({ userId: id });
+    // Location assignment now handled via UserQuizAssignment system
+    // if (updateUserDto.locationId !== undefined) {
+    //   // Remove existing location
+    //   await this.userLocationRepository.delete({ userId: id });
 
-      // Add new location if provided
-      if (updateUserDto.locationId) {
-        const location = await this.configItemRepository.findOne({
-          where: { id: updateUserDto.locationId, group: 'location' },
-        });
+    //   // Add new location if provided
+    //   if (updateUserDto.locationId) {
+    //     const location = await this.configItemRepository.findOne({
+    //       where: { id: updateUserDto.locationId, group: 'location' },
+    //     });
 
-        if (location) {
-          const userLocation = this.userLocationRepository.create({
-            userId: id,
-            locationId: updateUserDto.locationId,
-          });
-          await this.userLocationRepository.save(userLocation);
-        }
-      }
-    }
+    //     if (location) {
+    //       const userLocation = this.userLocationRepository.create({
+    //         userId: id,
+    //         locationId: updateUserDto.locationId,
+    //       });
+    //       await this.userLocationRepository.save(userLocation);
+    //     }
+    //   }
+    // }
 
     return this.findOne(id);
   }

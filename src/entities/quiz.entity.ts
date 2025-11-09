@@ -117,4 +117,10 @@ export class Quiz {
     eager: false,
   })
   scoringTemplates: any[];
+
+  @OneToMany('UserQuizAssignment', 'quiz', {
+    cascade: true,
+    eager: false,
+  })
+  userAssignments: any[];
 }

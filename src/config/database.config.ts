@@ -1,7 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserLocation, QuizImage } from '../entities';
+import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserQuizAssignment, QuizImage } from '../entities';
 import * as dotenv from 'dotenv';
 
 // Load environment variables
@@ -16,7 +16,7 @@ export const databaseConfig = registerAs(
     username: process.env.DATABASE_USERNAME || 'postgres',
     password: process.env.DATABASE_PASSWORD?.replace(/"/g, '') || '', // Remove quotes if present
     database: process.env.DATABASE_NAME || 'quiz',
-    entities: [User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserLocation, QuizImage],
+    entities: [User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserQuizAssignment, QuizImage],
     migrations: ['dist/migrations/*.js'],
     synchronize: process.env.DATABASE_SYNCHRONIZE === 'true' || false,
     logging: process.env.DATABASE_LOGGING === 'true' || false,

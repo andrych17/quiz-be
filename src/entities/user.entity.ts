@@ -8,7 +8,6 @@ import {
   OneToOne,
 } from 'typeorm';
 import { Attempt } from './attempt.entity';
-import { UserLocation } from './user-location.entity';
 
 @Entity('users')
 export class User {
@@ -26,10 +25,10 @@ export class User {
 
   @Column({
     type: 'enum',
-    enum: ['admin', 'user'],
+    enum: ['superadmin', 'admin', 'user'],
     default: 'user',
   })
-  role: 'admin' | 'user';
+  role: 'superadmin' | 'admin' | 'user';
 
   @Column({ type: 'timestamp', nullable: true })
   lastLogin: Date;
@@ -50,6 +49,6 @@ export class User {
   updatedAt: Date;
 
   // Relations
-  @OneToOne(() => UserLocation, userLocation => userLocation.user)
-  location: UserLocation;
+  @OneToMany('UserQuizAssignment', 'user')
+  quizAssignments: any[];
 }

@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   HttpStatus,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -50,7 +51,10 @@ export class QuizController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all quizzes with pagination' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin', 'user')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all quizzes with pagination (filtered by user role)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
@@ -61,12 +65,14 @@ export class QuizController {
     type: [QuizResponseDto],
   })
   async findAll(
+    @Request() req: any,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
     @Query('isActive') isActive?: boolean,
   ): Promise<StdApiResponse<any>> {
-    return this.quizService.findAll(page, limit, search, isActive);
+    const user = req.user;
+    return this.quizService.findAllForUser(user.id, user.role, page, limit, search, isActive);
   }
 
   @Get(':id')
@@ -384,5 +390,22 @@ export class QuizController {
   ): Promise<StdApiResponse<any>> {
     const result = await this.quizService.getQuizTemplatePreview(id);
     return ResponseFactory.success(result, 'Quiz template preview retrieved successfully');
+  }
+
+  @Get('public/:token')
+  @ApiOperation({ summary: 'Get published quiz by token (public access - no auth required)' })
+  @ApiParam({ name: 'token', type: String, description: 'Quiz token for public access' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Published quiz retrieved successfully',
+    type: QuizResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Quiz not found or not published',
+  })
+  async getPublicQuiz(@Param('token') token: string): Promise<StdApiResponse<QuizResponseDto>> {
+    const result = await this.quizService.findByTokenPublic(token);
+    return ResponseFactory.success(result, 'Quiz retrieved successfully');
   }
 }

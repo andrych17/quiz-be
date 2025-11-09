@@ -10,7 +10,7 @@ import { Question } from './entities/question.entity';
 import { Attempt } from './entities/attempt.entity';
 import { AttemptAnswer } from './entities/attempt-answer.entity';
 import { ConfigItem } from './entities/config-item.entity';
-import { UserLocation } from './entities/user-location.entity';
+import { UserQuizAssignment } from './entities/user-quiz-assignment.entity';
 import { QuizImage } from './entities/quiz-image.entity';
 import { QuizScoring } from './entities/quiz-scoring.entity';
 import { UserQuizSession } from './entities/user-quiz-session.entity';
@@ -23,7 +23,7 @@ import { AttemptController } from './controllers/attempt.controller';
 import { ConfigController } from './controllers/config.controller';
 import { UserQuizSessionController } from './controllers/user-quiz-session.controller';
 import { AttemptAnswerController } from './controllers/attempt-answer.controller';
-import { UserLocationController } from './controllers/user-location.controller';
+import { UserQuizAssignmentController } from './controllers/user-quiz-assignment.controller';
 
 // Services
 import { UserService } from './services/user.service';
@@ -34,7 +34,7 @@ import { ConfigService } from './services/config.service';
 import { UrlShortenerService } from './services/url-shortener.service';
 import { UserQuizSessionService } from './services/user-quiz-session.service';
 import { AttemptAnswerService } from './services/attempt-answer.service';
-import { UserLocationService } from './services/user-location.service';
+import { UserQuizAssignmentService } from './services/user-quiz-assignment.service';
 
 // Auth Module
 import { AuthModule } from './auth/auth.module';
@@ -62,7 +62,7 @@ import { databaseConfig } from './config/database.config';
       Attempt,
       AttemptAnswer,
       ConfigItem,
-      UserLocation,
+      UserQuizAssignment,
       QuizImage,
       QuizScoring,
       UserQuizSession,
@@ -77,7 +77,7 @@ import { databaseConfig } from './config/database.config';
     AttemptController,
     ConfigController,
     AttemptAnswerController,
-    UserLocationController,
+    UserQuizAssignmentController,
     UserQuizSessionController,
   ],
   providers: [
@@ -88,7 +88,7 @@ import { databaseConfig } from './config/database.config';
     ConfigService,
     UrlShortenerService,
     AttemptAnswerService,
-    UserLocationService,
+    UserQuizAssignmentService,
     UserQuizSessionService,
   ],
 })

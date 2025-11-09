@@ -10,7 +10,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
 import { UserService } from '../services/user.service';
 import { User } from '../entities/user.entity';
-import { UserLocation } from '../entities/user-location.entity';
+import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
 import { ConfigItem } from '../entities/config-item.entity';
 
 @Module({
@@ -26,7 +26,7 @@ import { ConfigItem } from '../entities/config-item.entity';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User, UserLocation, ConfigItem]),
+    TypeOrmModule.forFeature([User, UserQuizAssignment, ConfigItem]),
   ],
   controllers: [AuthController],
   providers: [AuthService, UserService, LocalStrategy, JwtStrategy],

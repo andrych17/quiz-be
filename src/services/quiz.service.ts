@@ -5,6 +5,7 @@ import { Quiz, QuizType } from '../entities/quiz.entity';
 import { Question } from '../entities/question.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
 import { QuizScoring } from '../entities/quiz-scoring.entity';
+import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
 import { CreateQuizDto, UpdateQuizDto, QuizResponseDto, ServiceType, StartManualQuizDto } from '../dto/quiz.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { APP_URLS } from '../constants/app.constants';
@@ -22,6 +23,8 @@ export class QuizService {
     private readonly quizImageRepository: Repository<QuizImage>,
     @InjectRepository(QuizScoring)
     private readonly quizScoringRepository: Repository<QuizScoring>,
+    @InjectRepository(UserQuizAssignment)
+    private readonly userQuizAssignmentRepository: Repository<UserQuizAssignment>,
   ) {}
 
   // Helper method to get full image URL from file server
@@ -92,6 +95,76 @@ export class QuizService {
       order: { createdAt: 'DESC' },
       relations: ['questions', 'attempts', 'images', 'scoringTemplates', 'location'],
     });
+
+    // Transform images to include full URLs for all quizzes
+    const transformedQuizzes = quizzes.map(quiz => ({
+      ...quiz,
+      images: quiz.images?.map(image => ({
+        ...image,
+        fullUrl: this.getFullImageUrl(image.filePath),
+      })) || []
+    }));
+
+    return ResponseFactory.paginated(
+      transformedQuizzes,
+      total,
+      page,
+      limit,
+      search ? `Found ${total} quizzes matching "${search}"` : 'Quizzes retrieved successfully'
+    );
+  }
+
+  async findAllForUser(
+    userId: number,
+    userRole: string,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    isActive?: boolean,
+  ): Promise<ApiResponse<any>> {
+    const skip = (page - 1) * limit;
+    
+    // Build query based on user role
+    const queryBuilder = this.quizRepository
+      .createQueryBuilder('quiz')
+      .leftJoinAndSelect('quiz.questions', 'questions')
+      .leftJoinAndSelect('quiz.attempts', 'attempts')
+      .leftJoinAndSelect('quiz.images', 'images')
+      .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates')
+      .leftJoinAndSelect('quiz.location', 'location');
+
+    // Superadmin sees all quizzes
+    if (userRole === 'superadmin') {
+      // No additional filtering needed
+    } 
+    // Admin sees only assigned quizzes
+    else if (userRole === 'admin') {
+      queryBuilder
+        .innerJoin('quiz.userAssignments', 'userAssignments')
+        .where('userAssignments.userId = :userId', { userId })
+        .andWhere('userAssignments.isActive = :isAssignmentActive', { isAssignmentActive: true });
+    }
+    // Regular users see published quizzes only
+    else {
+      queryBuilder.where('quiz.isPublished = :isPublished', { isPublished: true });
+    }
+
+    // Apply search filter
+    if (search) {
+      queryBuilder.andWhere('quiz.title ILIKE :search', { search: `%${search}%` });
+    }
+
+    // Apply active filter
+    if (isActive !== undefined) {
+      queryBuilder.andWhere('quiz.isActive = :isActive', { isActive });
+    }
+
+    // Apply pagination and ordering
+    const [quizzes, total] = await queryBuilder
+      .orderBy('quiz.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
 
     // Transform images to include full URLs for all quizzes
     const transformedQuizzes = quizzes.map(quiz => ({
@@ -536,5 +609,44 @@ export class QuizService {
 
     // Return updated quiz
     return this.findOne(quizId);
+  }
+
+  async findByTokenPublic(token: string): Promise<QuizResponseDto> {
+    const quiz = await this.quizRepository.findOne({
+      where: { 
+        token,
+        isActive: true,
+        isPublished: true // Only published quizzes are accessible publicly
+      },
+      relations: ['questions', 'images', 'scoringTemplates', 'location'],
+    });
+
+    if (!quiz) {
+      throw new NotFoundException('Quiz not found or not published for public access');
+    }
+
+    // Check if quiz is currently accessible
+    if (quiz.quizType === 'scheduled') {
+      const now = new Date();
+      if (quiz.startDateTime && quiz.endDateTime) {
+        if (now < quiz.startDateTime) {
+          throw new BadRequestException('Quiz has not started yet');
+        }
+        if (now > quiz.endDateTime) {
+          throw new BadRequestException('Quiz has already ended');
+        }
+      }
+    }
+
+    // Transform images to include full URLs
+    const transformedQuiz = {
+      ...quiz,
+      images: quiz.images?.map(image => ({
+        ...image,
+        fullUrl: this.getFullImageUrl(image.filePath),
+      })) || []
+    };
+
+    return transformedQuiz;
   }
 }
