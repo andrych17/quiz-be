@@ -93,7 +93,7 @@ export class QuizService {
       skip,
       take: limit,
       order: { createdAt: 'DESC' },
-      relations: ['questions', 'attempts', 'images', 'scoringTemplates', 'location'],
+      relations: ['questions', 'attempts', 'images', 'scoringTemplates'],
     });
 
     // Transform images to include full URLs for all quizzes
@@ -130,8 +130,7 @@ export class QuizService {
       .leftJoinAndSelect('quiz.questions', 'questions')
       .leftJoinAndSelect('quiz.attempts', 'attempts')
       .leftJoinAndSelect('quiz.images', 'images')
-      .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates')
-      .leftJoinAndSelect('quiz.location', 'location');
+      .leftJoinAndSelect('quiz.scoringTemplates', 'scoringTemplates');
 
     // Superadmin sees all quizzes
     if (userRole === 'superadmin') {
@@ -187,7 +186,7 @@ export class QuizService {
   async findOne(id: number): Promise<QuizResponseDto> {
     const quiz = await this.quizRepository.findOne({
       where: { id },
-      relations: ['questions', 'attempts', 'images', 'scoringTemplates', 'location'],
+      relations: ['questions', 'attempts', 'images', 'scoringTemplates'],
     });
 
     if (!quiz) {
@@ -282,7 +281,6 @@ export class QuizService {
       questionsPerPage: originalQuiz.questionsPerPage,
       startDateTime: originalQuiz.startDateTime,
       endDateTime: originalQuiz.endDateTime,
-      quizLink: `https://quiz.gms.com/q/${generateToken()}`, // Generate new link
     });
 
     const savedQuiz = await this.quizRepository.save(duplicatedQuiz);
@@ -417,7 +415,7 @@ export class QuizService {
       skip,
       take: limit,
       order: { createdAt: 'DESC' },
-      relations: ['questions', 'images', 'scoringTemplates', 'location'],
+      relations: ['questions', 'images', 'scoringTemplates'],
     });
 
     return ResponseFactory.paginated(
@@ -437,8 +435,7 @@ export class QuizService {
       relations: [
         'questions', 
         'images', 
-        'scoringTemplates', 
-        'location'
+        'scoringTemplates'
       ],
     });
 
@@ -572,7 +569,7 @@ export class QuizService {
     // Get quiz
     const quiz = await this.quizRepository.findOne({
       where: { id: quizId },
-      relations: ['questions', 'images', 'scoringTemplates', 'location'],
+      relations: ['questions', 'images', 'scoringTemplates'],
     });
 
     if (!quiz) {
@@ -618,7 +615,7 @@ export class QuizService {
         isActive: true,
         isPublished: true // Only published quizzes are accessible publicly
       },
-      relations: ['questions', 'images', 'scoringTemplates', 'location'],
+      relations: ['questions', 'images', 'scoringTemplates'],
     });
 
     if (!quiz) {

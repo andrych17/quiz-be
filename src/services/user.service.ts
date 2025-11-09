@@ -87,7 +87,6 @@ export class UserService {
       skip,
       take: limit,
       select: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
-      relations: ['location', 'location.location'],
     });
 
     return ResponseFactory.paginated(
@@ -103,7 +102,6 @@ export class UserService {
     const user = await this.userRepository.findOne({
       where: { id },
       select: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
-      relations: ['location', 'location.location'],
     });
 
     if (!user) {
