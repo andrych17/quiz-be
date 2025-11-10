@@ -68,6 +68,18 @@ export class ConfigController {
     return ResponseFactory.success(result, 'Location config items retrieved successfully');
   }
 
+  @Get('services')
+  @ApiOperation({ summary: 'Get all service configuration items' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Service config items retrieved successfully',
+    type: [ConfigItemResponseDto],
+  })
+  async getServices(): Promise<StdApiResponse<any>> {
+    const result = await this.configService.getServices();
+    return ResponseFactory.success(result, 'Service config items retrieved successfully');
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get configuration item by ID' })
   @ApiParam({ name: 'id', type: Number })

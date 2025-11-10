@@ -351,6 +351,7 @@ const handleExpiredToken = () => {
 - `POST /api/config` - Create config item
 - `GET /api/config` - Get all config items
 - `GET /api/config/locations` - Get location configs
+- `GET /api/config/services` - Get service configs
 - `GET /api/config/:id` - Get config by ID
 - `PUT /api/config/:id` - Update config
 - `DELETE /api/config/:id` - Delete config

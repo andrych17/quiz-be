@@ -124,8 +124,15 @@ export class ConfigService {
 
   async getLocations(): Promise<ConfigItem[]> {
     return this.configItemRepository.find({
-      where: { group: 'LOCATION' },
-      order: { key: 'ASC' },
+      where: { group: 'location' },
+      order: { order: 'ASC', key: 'ASC' },
+    });
+  }
+
+  async getServices(): Promise<ConfigItem[]> {
+    return this.configItemRepository.find({
+      where: { group: 'service' },
+      order: { order: 'ASC', key: 'ASC' },
     });
   }
 
