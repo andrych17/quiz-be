@@ -54,8 +54,8 @@ export class UserController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or email' })
-  @ApiQuery({ name: 'serviceId', required: false, type: Number, description: 'Filter by service ID' })
-  @ApiQuery({ name: 'locationId', required: false, type: Number, description: 'Filter by location ID' })
+  @ApiQuery({ name: 'serviceKey', required: false, type: String, description: 'Filter by service key (e.g., sm, am, network_operation)' })
+  @ApiQuery({ name: 'locationKey', required: false, type: String, description: 'Filter by location key (e.g., jakarta_pusat, jakarta_utara)' })
   @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by user role' })
   @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (name, email, role, createdAt, updatedAt)' })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
@@ -74,8 +74,10 @@ export class UserController {
     @Query('sortBy') sortBy: string = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
-    return this.userService.findAll(page, limit, search, serviceKey, locationKey, role, sortBy, sortOrder);
+    return this.userService.findAllWithDisplayNames(page, limit, search, serviceKey, locationKey, role, sortBy, sortOrder);
   }
+
+
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)

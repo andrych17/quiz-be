@@ -80,7 +80,52 @@ export class QuizController {
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const user = req.user;
-    return this.quizService.findAllForUser(user.id, user.role, page, limit, search, isActive, serviceKey, locationKey, sortBy, sortOrder);
+    return this.quizService.findAllForUserWithDisplayNames(user.id, user.role, page, limit, search, isActive, serviceKey, locationKey, sortBy, sortOrder);
+  }
+
+
+
+  @Get('mapping-guide')
+  @ApiOperation({ summary: 'Get comprehensive guide for quiz filtering and mappings' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Complete filtering and mapping guide retrieved successfully',
+  })
+  async getMappingGuide() {
+    return ResponseFactory.success({
+      guide: 'Complete Guide for Quiz Filtering and Display Mappings',
+      endpoints: {
+        'GET /api/quizzes': 'Returns quiz data with serviceKey and locationKey',
+        'GET /api/quizzes/with-display-names': 'Returns quiz data with serviceName and locationName already mapped',
+        'GET /api/config/ui-mappings': 'Returns mapping objects for manual mapping'
+      },
+      filteringRules: {
+        superadmin: 'Sees all quizzes, can filter by any serviceKey/locationKey',
+        admin: 'Sees only assigned quizzes through UserQuizAssignment table',
+        user: 'Sees only published quizzes + filtered by user\'s own serviceKey/locationKey from User table'
+      },
+      filterValues: {
+        'all_services': 'Shows all services (ignores service filter)',
+        'all_locations': 'Shows all locations (ignores location filter)', 
+        'specific_key': 'Filters by exact serviceKey or locationKey match',
+        'empty_or_null': 'No filtering applied'
+      },
+      userBasedFiltering: {
+        description: 'Regular users automatically see quizzes matching their serviceKey and locationKey from User table',
+        example: 'User with serviceKey="sm" and locationKey="jakarta_pusat" only sees SM quizzes in Jakarta Pusat'
+      },
+      displayMappings: {
+        serviceKey: 'network_operation',
+        serviceName: 'Network Operation',
+        locationKey: 'jakarta_utara', 
+        locationName: 'Jakarta Utara'
+      },
+      currentData: {
+        availableServiceKeys: ['sm', 'network_operation'],
+        availableLocationKeys: ['jakarta_pusat', 'jakarta_utara'],
+        specialFilterValues: ['all_services', 'all_locations']
+      }
+    }, 'Complete filtering and mapping guide retrieved successfully');
   }
 
   @Get(':id')

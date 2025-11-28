@@ -38,6 +38,17 @@ export class ConfigController {
     return ResponseFactory.success(result, 'Config item created successfully', undefined, HttpStatus.CREATED);
   }
 
+  @Get('ui-mappings')
+  @ApiOperation({ summary: 'Get key-value mappings for locations and services for UI' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Config mappings retrieved successfully',
+  })
+  async getMappings(): Promise<StdApiResponse<any>> {
+    const result = await this.configService.getMappings();
+    return ResponseFactory.success(result, 'Config mappings retrieved successfully');
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all configuration items with pagination' })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -56,8 +67,9 @@ export class ConfigController {
     @Query('group') group?: string,
     @Query('sortBy') sortBy: string = 'group',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'ASC',
-  ) {
-    return this.configService.findAll(page, limit, group, sortBy, sortOrder);
+  ): Promise<StdApiResponse<any>> {
+    const result = await this.configService.findAll(page, limit, group, sortBy, sortOrder);
+    return ResponseFactory.success(result, 'Config items retrieved successfully');
   }
 
   @Get('locations')

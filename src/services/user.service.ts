@@ -8,6 +8,7 @@ import { ConfigItem } from '../entities/config-item.entity';
 import { CreateUserDto, UpdateUserDto, UserResponseDto, UserDetailResponseDto, UserRole } from '../dto/user.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, DEFAULTS } from '../constants';
 import { AutoAssignmentService } from './auto-assignment.service';
+import { ConfigService } from './config.service';
 
 @Injectable()
 export class UserService {
@@ -19,6 +20,7 @@ export class UserService {
     @InjectRepository(ConfigItem)
     private configItemRepository: Repository<ConfigItem>,
     private autoAssignmentService: AutoAssignmentService,
+    private configService: ConfigService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDetailResponseDto> {
@@ -122,13 +124,13 @@ export class UserService {
         'user.updatedAt'
       ]);
 
-    // Add service filter
-    if (serviceKey) {
+    // Add service filter (ignore "all_services" and similar values)
+    if (serviceKey && serviceKey !== 'all_services' && !serviceKey.startsWith('all_')) {
       queryBuilder.andWhere('user.serviceKey = :serviceKey', { serviceKey });
     }
     
-    // Add location filter
-    if (locationKey) {
+    // Add location filter (ignore "all_locations" and similar values)
+    if (locationKey && locationKey !== 'all_locations' && !locationKey.startsWith('all_')) {
       queryBuilder.andWhere('user.locationKey = :locationKey', { locationKey });
     }
     
@@ -365,5 +367,34 @@ export class UserService {
 
   async validatePassword(user: User, password: string): Promise<boolean> {
     return bcrypt.compare(password, user.password);
+  }
+
+  async findAllWithDisplayNames(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    serviceKey?: string,
+    locationKey?: string,
+    role?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC'
+  ) {
+    // Get user data using existing method
+    const userData = await this.findAll(page, limit, search, serviceKey, locationKey, role, sortBy, sortOrder);
+    
+    // Get config mappings
+    const mappings = await this.configService.getMappings();
+    
+    // Enhance user data with display names
+    const enhancedUsers = userData.items.map(user => ({
+      ...user,
+      serviceName: user.serviceKey ? (mappings.services.mapping[user.serviceKey] || user.serviceKey) : null,
+      locationName: user.locationKey ? (mappings.locations.mapping[user.locationKey] || user.locationKey) : null
+    }));
+
+    return {
+      items: enhancedUsers,
+      pagination: userData.pagination
+    };
   }
 }

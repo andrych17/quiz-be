@@ -6,12 +6,14 @@ import { Question } from '../entities/question.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
 import { QuizScoring } from '../entities/quiz-scoring.entity';
 import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
+import { User } from '../entities/user.entity';
 import { CreateQuizDto, UpdateQuizDto, QuizResponseDto, QuizDetailResponseDto, ServiceType, StartManualQuizDto } from '../dto/quiz.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { APP_URLS } from '../constants/app.constants';
 import { generateSlug, generateToken } from '../lib/utils';
 import { UrlGeneratorService } from './url-generator.service';
 import { AutoAssignmentService } from './auto-assignment.service';
+import { ConfigService } from './config.service';
 
 @Injectable()
 export class QuizService {
@@ -26,8 +28,11 @@ export class QuizService {
     private readonly quizScoringRepository: Repository<QuizScoring>,
     @InjectRepository(UserQuizAssignment)
     private readonly userQuizAssignmentRepository: Repository<UserQuizAssignment>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly urlGeneratorService: UrlGeneratorService,
     private readonly autoAssignmentService: AutoAssignmentService,
+    private readonly configService: ConfigService,
   ) {}
 
   // Helper method to get full image URL from file server
@@ -215,6 +220,9 @@ export class QuizService {
   ) {
     const skip = (page - 1) * limit;
     
+    // Get user information for filtering
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    
     // Build query based on user role
     const queryBuilder = this.quizRepository
       .createQueryBuilder('quiz')
@@ -236,6 +244,14 @@ export class QuizService {
     // Regular users see published quizzes only
     else {
       queryBuilder.where('quiz.isPublished = :isPublished', { isPublished: true });
+      
+      // For regular users, apply user's service and location restrictions
+      if (user?.serviceKey) {
+        queryBuilder.andWhere('quiz.serviceKey = :userServiceKey', { userServiceKey: user.serviceKey });
+      }
+      if (user?.locationKey) {
+        queryBuilder.andWhere('quiz.locationKey = :userLocationKey', { userLocationKey: user.locationKey });
+      }
     }
 
     // Apply search filter
@@ -251,13 +267,13 @@ export class QuizService {
       queryBuilder.andWhere('quiz.isActive = :isActive', { isActive });
     }
 
-    // Apply service filter
-    if (serviceKey) {
+    // Apply service filter (ignore "all_services" and similar values)
+    if (serviceKey && serviceKey !== 'all_services' && !serviceKey.startsWith('all_')) {
       queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
     }
 
-    // Apply location filter
-    if (locationKey) {
+    // Apply location filter (ignore "all_locations" and similar values)  
+    if (locationKey && locationKey !== 'all_locations' && !locationKey.startsWith('all_')) {
       queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
     }
 
@@ -856,5 +872,57 @@ export class QuizService {
     };
 
     return transformedQuiz;
+  }
+
+  async getQuizzesWithMappings(
+    userId: number, 
+    userRole: string, 
+    page: number = 1, 
+    limit: number = 10,
+    serviceKey?: string,
+    locationKey?: string
+  ) {
+    // Get quiz data using existing method
+    const quizData = await this.findAllForUser(userId, userRole, page, limit, undefined, undefined, serviceKey, locationKey);
+    
+    // Get config mappings
+    const mappings = await this.configService.getMappings();
+    
+    // Simply return combined data without complex mapping for now
+    return {
+      ...quizData,
+      mappings: mappings
+    };
+  }
+
+  async findAllForUserWithDisplayNames(
+    userId: number,
+    userRole: string,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    isActive?: boolean,
+    serviceKey?: string,
+    locationKey?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ) {
+    // Get quiz data using existing method
+    const quizData = await this.findAllForUser(userId, userRole, page, limit, search, isActive, serviceKey, locationKey, sortBy, sortOrder);
+    
+    // Get config mappings
+    const mappings = await this.configService.getMappings();
+    
+    // Enhance quiz data with display names
+    const enhancedQuizzes = quizData.items.map(quiz => ({
+      ...quiz,
+      serviceName: quiz.serviceKey ? (mappings.services.mapping[quiz.serviceKey] || quiz.serviceKey) : null,
+      locationName: quiz.locationKey ? (mappings.locations.mapping[quiz.locationKey] || quiz.locationKey) : null
+    }));
+
+    return {
+      items: enhancedQuizzes,
+      pagination: quizData.pagination
+    };
   }
 }

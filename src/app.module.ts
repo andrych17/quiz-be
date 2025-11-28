@@ -29,7 +29,6 @@ import { UserQuizAssignmentController } from './controllers/user-quiz-assignment
 import { QuizService } from './services/quiz.service';
 import { QuestionService } from './services/question.service';
 import { AttemptService } from './services/attempt.service';
-import { ConfigService } from './services/config.service';
 import { UrlShortenerService } from './services/url-shortener.service';
 import { UserQuizSessionService } from './services/user-quiz-session.service';
 import { AttemptAnswerService } from './services/attempt-answer.service';
@@ -88,7 +87,6 @@ import { databaseConfig } from './config/database.config';
     QuizService,
     QuestionService,
     AttemptService,
-    ConfigService,
     UrlShortenerService,
     AttemptAnswerService,
     UserQuizAssignmentService,

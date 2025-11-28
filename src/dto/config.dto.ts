@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsNumber, IsBoolean } from 'class-validator';
 
 export class CreateConfigItemDto {
   @ApiProperty({ example: 'LOCATION', description: 'Configuration group' })
@@ -21,6 +21,16 @@ export class CreateConfigItemDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ example: 0, description: 'Display order' })
+  @IsOptional()
+  @IsNumber()
+  order?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Active status', default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class UpdateConfigItemDto {
@@ -43,6 +53,16 @@ export class UpdateConfigItemDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ example: 0, description: 'Display order' })
+  @IsOptional()
+  @IsNumber()
+  order?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Active status' })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class ConfigItemResponseDto {
@@ -60,6 +80,18 @@ export class ConfigItemResponseDto {
 
   @ApiProperty({ example: 'Main office location', description: 'Configuration description' })
   description: string;
+
+  @ApiProperty({ example: 0, description: 'Display order' })
+  order: number;
+
+  @ApiProperty({ example: true, description: 'Active status' })
+  isActive: boolean;
+
+  @ApiProperty({ example: 'admin', description: 'Created by user' })
+  createdBy: string;
+
+  @ApiProperty({ example: 'admin', description: 'Updated by user' })
+  updatedBy: string;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
   createdAt: Date;

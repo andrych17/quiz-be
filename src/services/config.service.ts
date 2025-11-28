@@ -27,7 +27,11 @@ export class ConfigService {
         throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_ENTRY);
       }
 
-      const configItem = this.configItemRepository.create(createConfigItemDto);
+      const configItem = this.configItemRepository.create({
+        ...createConfigItemDto,
+        isActive: createConfigItemDto.isActive ?? true, // Default to true if not provided
+        order: createConfigItemDto.order ?? 0, // Default to 0 if not provided
+      });
       return await this.configItemRepository.save(configItem);
     } catch (error) {
       if (error instanceof BadRequestException) {
@@ -154,6 +158,42 @@ export class ConfigService {
       where: { group: 'service' },
       order: { order: 'ASC', key: 'ASC' },
     });
+  }
+
+  async getMappings(): Promise<any> {
+    const locations = await this.getLocations();
+    const services = await this.getServices();
+
+    const locationMapping = locations.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {});
+
+    const serviceMapping = services.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {});
+
+    return {
+      locations: {
+        mapping: locationMapping,
+        options: locations.map(item => ({
+          key: item.key,
+          value: item.value,
+          description: item.description,
+          order: item.order
+        }))
+      },
+      services: {
+        mapping: serviceMapping,
+        options: services.map(item => ({
+          key: item.key,
+          value: item.value,
+          description: item.description,
+          order: item.order
+        }))
+      }
+    };
   }
 
   async findByKey(group: string, key: string): Promise<ConfigItem | null> {
