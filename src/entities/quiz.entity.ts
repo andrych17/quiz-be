@@ -8,7 +8,6 @@ import {
   OneToOne,
   Index,
 } from 'typeorm';
-import { ServiceType } from '../dto/quiz.dto';
 
 export enum QuizType {
   SCHEDULED = 'scheduled',
@@ -37,11 +36,8 @@ export class Quiz {
   @Column({ unique: true })
   token: string;
 
-  @Column({
-    type: 'enum',
-    enum: ServiceType,
-  })
-  serviceType: ServiceType; // Jenis pelayanan (e.g., 'service-management', 'network-management', 'database-admin', etc.)
+  @Column({ nullable: true })
+  serviceType: string; // Jenis pelayanan - dynamic from config service group (e.g., 'service_management', 'network_management', etc.)
 
   @Column({
     type: 'enum',

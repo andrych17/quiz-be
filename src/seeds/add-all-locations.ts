@@ -19,11 +19,11 @@ async function addAllLocations() {
     console.log('🚀 Connecting to database...');
     await dataSource.initialize();
     const repo = dataSource.getRepository(ConfigItem);
-    
+
     const existing = await repo.findOne({
-      where: { group: 'location', key: 'all_locations' }
+      where: { group: 'location', key: 'all_locations' },
     });
-    
+
     if (!existing) {
       await repo.save({
         group: 'location',

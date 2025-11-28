@@ -41,7 +41,9 @@ export class UserQuizAssignment {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => User, user => user.quizAssignments, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.quizAssignments, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'userId' })
   user: User;
 

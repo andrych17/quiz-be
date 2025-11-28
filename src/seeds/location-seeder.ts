@@ -15,7 +15,7 @@ export async function seedLocationData(dataSource: DataSource) {
       createdBy: 'system',
     },
     {
-      group: 'location', 
+      group: 'location',
       key: 'jakarta_selatan',
       value: 'Jakarta Selatan',
       description: 'DKI Jakarta - Jakarta Selatan',
@@ -25,7 +25,7 @@ export async function seedLocationData(dataSource: DataSource) {
     {
       group: 'location',
       key: 'jakarta_timur',
-      value: 'Jakarta Timur', 
+      value: 'Jakarta Timur',
       description: 'DKI Jakarta - Jakarta Timur',
       isActive: true,
       createdBy: 'system',
@@ -85,7 +85,7 @@ export async function seedLocationData(dataSource: DataSource) {
       description: 'Sulawesi Selatan - Makassar',
       isActive: true,
       createdBy: 'system',
-    }
+    },
   ];
 
   // Check if locations already exist, if not, create them

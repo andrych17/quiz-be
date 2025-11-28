@@ -10,6 +10,7 @@ import {
   Index,
 } from 'typeorm';
 import { Quiz } from './quiz.entity';
+import { AttemptAnswer } from './attempt-answer.entity';
 
 @Entity('attempts')
 @Index(['quizId', 'email'], { unique: true }) // Prevent duplicate attempts from same email per quiz
@@ -33,7 +34,16 @@ export class Attempt {
   nij: string; // Nomor Induk Jemaat/NIJ
 
   @Column({ type: 'int', default: 0 })
-  score: number;
+  score: number; // Nilai akhir (bisa 70, 80, 90 untuk mode IPK, atau 0-100 untuk mode persentase)
+
+  @Column({ length: 10, nullable: true })
+  grade: string; // Grade (A, B, C, D, E, F)
+
+  @Column({ type: 'int', default: 0 })
+  correctAnswers: number; // Jumlah jawaban benar
+
+  @Column({ type: 'int', default: 0 })
+  totalQuestions: number; // Total soal
 
   @Column({ default: false })
   passed: boolean; // Apakah lulus berdasarkan passing score
@@ -58,9 +68,9 @@ export class Attempt {
   @JoinColumn({ name: 'quizId' })
   quiz: Quiz;
 
-  @OneToMany('AttemptAnswer', 'attempt', {
+  @OneToMany(() => AttemptAnswer, (answer) => answer.attempt, {
     cascade: true,
     eager: false,
   })
-  answers: any[];
+  answers: AttemptAnswer[];
 }

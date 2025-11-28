@@ -12,7 +12,8 @@ export class ServiceSeeder {
         group: 'service',
         key: 'sm',
         value: 'Service Management',
-        description: 'Departemen Service Management - pengelolaan layanan pelanggan',
+        description:
+          'Departemen Service Management - pengelolaan layanan pelanggan',
         order: 1,
         isActive: true,
         createdBy: 'system',
@@ -21,7 +22,8 @@ export class ServiceSeeder {
         group: 'service',
         key: 'am',
         value: 'Account Management',
-        description: 'Departemen Account Management - pengelolaan akun pelanggan',
+        description:
+          'Departemen Account Management - pengelolaan akun pelanggan',
         order: 2,
         isActive: true,
         createdBy: 'system',
@@ -111,7 +113,10 @@ export class ServiceSeeder {
         await configItemRepository.save(newService);
         console.log(`✅ Created service: ${serviceData.value}`);
       } catch (error) {
-        console.error(`❌ Error creating service ${serviceData.value}:`, error.message);
+        console.error(
+          `❌ Error creating service ${serviceData.value}:`,
+          error.message,
+        );
       }
     }
 

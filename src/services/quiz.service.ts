@@ -1,17 +1,35 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
-import { Quiz, QuizType } from '../entities/quiz.entity';
+import { Quiz } from '../entities/quiz.entity';
 import { Question } from '../entities/question.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
 import { QuizScoring } from '../entities/quiz-scoring.entity';
 import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
-import { CreateQuizDto, UpdateQuizDto, QuizResponseDto, QuizDetailResponseDto, ServiceType, StartManualQuizDto } from '../dto/quiz.dto';
+import { User } from '../entities/user.entity';
+import {
+  CreateQuizDto,
+  UpdateQuizDto,
+  QuizResponseDto,
+  QuizDetailResponseDto,
+} from '../dto/quiz.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import { APP_URLS } from '../constants/app.constants';
-import { generateSlug, generateToken } from '../lib/utils';
+import { generateSlug, generateToken, generateUniqueToken } from '../lib/utils';
 import { UrlGeneratorService } from './url-generator.service';
 import { AutoAssignmentService } from './auto-assignment.service';
+import { ConfigService } from './config.service';
+
+interface UserInfo {
+  id?: number;
+  email?: string;
+  name?: string;
+  role?: string;
+}
 
 @Injectable()
 export class QuizService {
@@ -26,8 +44,11 @@ export class QuizService {
     private readonly quizScoringRepository: Repository<QuizScoring>,
     @InjectRepository(UserQuizAssignment)
     private readonly userQuizAssignmentRepository: Repository<UserQuizAssignment>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly urlGeneratorService: UrlGeneratorService,
     private readonly autoAssignmentService: AutoAssignmentService,
+    private readonly configService: ConfigService,
   ) {}
 
   // Helper method to get full image URL from file server
@@ -37,63 +58,51 @@ export class QuizService {
     return `${APP_URLS.FILE_SERVER_URL}/${filePath}`;
   }
 
-  async create(createQuizDto: CreateQuizDto): Promise<QuizDetailResponseDto> {
+  async create(
+    createQuizDto: CreateQuizDto,
+    userInfo?: UserInfo,
+  ): Promise<any> {
     try {
       const slug = generateSlug(createQuizDto.title);
       const token = generateToken();
 
-      // Set default quizType to SCHEDULED if not provided
-      const quizType = createQuizDto.quizType || QuizType.SCHEDULED;
-
-      // Validation based on quiz type
-      if (quizType === QuizType.SCHEDULED) {
-        // Scheduled quiz should have both start and end dates
-        if (!createQuizDto.startDateTime || !createQuizDto.endDateTime) {
-          throw new BadRequestException('Scheduled quiz must have both startDateTime and endDateTime');
-        }
-      } else if (quizType === QuizType.MANUAL) {
-        // Manual quiz should have duration but no fixed dates (will be set when started)
-        if (!createQuizDto.durationMinutes) {
-          throw new BadRequestException('Manual quiz must have durationMinutes specified');
-        }
-      }
-
       const quiz = this.quizRepository.create({
         title: createQuizDto.title,
         description: createQuizDto.description,
-        serviceType: createQuizDto.serviceType,
         slug,
         token,
-        quizType,
         locationKey: createQuizDto.locationKey,
         serviceKey: createQuizDto.serviceKey,
         passingScore: createQuizDto.passingScore,
         questionsPerPage: createQuizDto.questionsPerPage,
         durationMinutes: createQuizDto.durationMinutes,
         isActive: createQuizDto.isActive ?? true,
-        isPublished: quizType === QuizType.SCHEDULED,
-        startDateTime: createQuizDto.startDateTime ? new Date(createQuizDto.startDateTime) : null,
-        endDateTime: createQuizDto.endDateTime ? new Date(createQuizDto.endDateTime) : null,
+        isPublished: false, // Default to not published
+        startDateTime: createQuizDto.startDateTime
+          ? new Date(createQuizDto.startDateTime)
+          : null,
+        endDateTime: createQuizDto.endDateTime
+          ? new Date(createQuizDto.endDateTime)
+          : null,
         quizLink: createQuizDto.quizLink,
+        createdBy: userInfo?.email || userInfo?.name || 'system',
+        updatedBy: userInfo?.email || userInfo?.name || 'system',
       });
 
       const savedQuiz = await this.quizRepository.save(quiz);
 
       // Generate URLs for the quiz
       if (savedQuiz.slug && savedQuiz.token) {
-        const urlAlias = this.urlGeneratorService.generateUrlAlias(savedQuiz.title);
         const urls = await this.urlGeneratorService.generateQuizUrls(
-          savedQuiz.slug, 
-          savedQuiz.token, 
-          urlAlias
-        );
-        
-        // Update quiz with generated URLs
+          savedQuiz.slug,
+          savedQuiz.token,
+          savedQuiz.id,
+        ); // Update quiz with generated URLs
         await this.quizRepository.update(savedQuiz.id, {
           normalUrl: urls.normalUrl,
           shortUrl: urls.shortUrl,
         });
-        
+
         savedQuiz.normalUrl = urls.normalUrl;
         savedQuiz.shortUrl = urls.shortUrl;
       }
@@ -101,30 +110,95 @@ export class QuizService {
       // Auto-assign admin users based on service and location
       if (savedQuiz.serviceKey || savedQuiz.locationKey) {
         await this.autoAssignmentService.autoAssignUsersToQuiz(
-          savedQuiz.id, 
+          savedQuiz.id,
           savedQuiz.serviceKey,
-          savedQuiz.locationKey, 
-          'system'
+          savedQuiz.locationKey,
+          'system',
         );
       }
 
-      // Handle scoring templates
+      // Handle scoring templates (untuk grade range A, B, C, dll)
       let savedScoringTemplates = [];
-      if (createQuizDto.scoringTemplates && createQuizDto.scoringTemplates.length > 0) {
-        const scoringTemplates = createQuizDto.scoringTemplates.map(templateData =>
-          this.quizScoringRepository.create({
-            quizId: savedQuiz.id,
-            scoringName: templateData.grade || 'Default Template',
-            correctAnswerPoints: templateData.maxScore || 10,
-            incorrectAnswerPenalty: 0,
-            unansweredPenalty: 0,
-            bonusPoints: 0,
-            multiplier: 1.0,
-            timeBonusEnabled: false,
-            isActive: true,
-          })
+      if (
+        createQuizDto.scoringTemplates &&
+        createQuizDto.scoringTemplates.length > 0
+      ) {
+        const scoringTemplates = createQuizDto.scoringTemplates.map(
+          (templateData) =>
+            this.quizScoringRepository.create({
+              quizId: savedQuiz.id,
+              scoringName: templateData.grade || 'Default Grade',
+              correctAnswerPoints: 1, // 1 point per jawaban benar (standard)
+              incorrectAnswerPenalty: 0,
+              unansweredPenalty: 0,
+              bonusPoints: 0,
+              multiplier: 1.0,
+              timeBonusEnabled: false,
+              maxScore: templateData.maxScore, // Max score untuk grade ini (dalam %)
+              minScore: templateData.minScore, // Min score untuk grade ini (dalam %)
+              passingScore: createQuizDto.passingScore,
+              isActive: true,
+              createdBy: userInfo?.email || userInfo?.name || 'system',
+              updatedBy: userInfo?.email || userInfo?.name || 'system',
+            }),
         );
-        savedScoringTemplates = await this.quizScoringRepository.save(scoringTemplates);
+        savedScoringTemplates =
+          await this.quizScoringRepository.save(scoringTemplates);
+      }
+
+      // Handle questions creation
+      let savedQuestions = [];
+      if (createQuizDto.questions && createQuizDto.questions.length > 0) {
+        console.log('Creating questions:', createQuizDto.questions.map((q, index) => ({
+          index,
+          questionText: q.questionText,
+          correctAnswer: q.correctAnswer,
+          correctAnswerLength: q.correctAnswer ? q.correctAnswer.length : 'undefined',
+          questionType: q.questionType
+        })));
+        
+        for (let i = 0; i < createQuizDto.questions.length; i++) {
+          const questionData = createQuizDto.questions[i];
+          
+          console.log(`Validating question ${i}:`, {
+            correctAnswer: questionData.correctAnswer,
+            correctAnswerType: typeof questionData.correctAnswer,
+            correctAnswerTrimmed: questionData.correctAnswer ? questionData.correctAnswer.trim() : 'undefined',
+            questionType: questionData.questionType
+          });
+          
+          // Essay questions don't need correct answers
+          if (questionData.questionType !== 'essay' && (!questionData.correctAnswer || questionData.correctAnswer.trim() === '')) {
+            console.error(`Question ${i} validation failed:`, questionData);
+            throw new BadRequestException(`Question ${i + 1}: correctAnswer is required and cannot be empty`);
+          }
+          
+          // Convert questionType to match enum values
+          let questionType: string = questionData.questionType;
+          if (questionType === 'essay') {
+            questionType = 'text'; // Map essay to text
+          } else if (questionType.includes('_')) {
+            questionType = questionType.replace('_', '-'); // Convert multiple_choice to multiple-choice
+          }
+          
+          const question = this.questionRepository.create({
+            quizId: savedQuiz.id,
+            questionText: questionData.questionText,
+            questionType: questionType as any,
+            options: questionData.options || [],
+            correctAnswer: questionData.correctAnswer ? questionData.correctAnswer.trim() : '',
+            order: questionData.order ?? i + 1, // Auto-generate order if not provided
+          });
+          
+          const savedQuestion = await this.questionRepository.save(question);
+          console.log(`Saved question ${i + 1}:`, {
+            id: savedQuestion.id,
+            correctAnswer: savedQuestion.correctAnswer,
+            questionText: savedQuestion.questionText.substring(0, 50) + '...'
+          });
+          
+          savedQuestions.push(savedQuestion);
+        }
       }
 
       // Get auto-assigned users
@@ -132,8 +206,8 @@ export class QuizService {
         where: { quizId: savedQuiz.id, isActive: true },
         relations: ['user'],
       });
-      
-      const assignedUsers = users.map(assignment => ({
+
+      const assignedUsers = users.map((assignment) => ({
         id: assignment.user.id,
         name: assignment.user.name,
         email: assignment.user.email,
@@ -144,14 +218,27 @@ export class QuizService {
       }));
 
       return {
-        ...savedQuiz,
-        questions: [],
-        images: [], // Images are now handled at question level
-        scoringTemplates: savedScoringTemplates,
-        assignedUsers,
-      } as QuizDetailResponseDto;
+        success: true,
+        message: 'Quiz created successfully',
+        data: {
+          ...savedQuiz,
+          questions: savedQuestions,
+          images: [], // Images are now handled at question level
+          scoringTemplates: savedScoringTemplates,
+          assignedUsers,
+        },
+      };
     } catch (error) {
-      throw new BadRequestException(ERROR_MESSAGES.DATABASE_ERROR);
+      console.error('Quiz creation error:', error);
+      return {
+        success: false,
+        message: ERROR_MESSAGES.DATABASE_ERROR,
+        error: 'DATABASE_ERROR',
+        data: {
+          title: createQuizDto.title,
+          originalError: error.message,
+        },
+      };
     }
   }
 
@@ -162,14 +249,12 @@ export class QuizService {
     isActive?: boolean,
   ) {
     const skip = (page - 1) * limit;
-    const whereCondition: any = {};
+    const whereCondition: any = {
+      isActive: isActive !== undefined ? isActive : true, // Default to true if not specified
+    };
 
     if (search) {
       whereCondition.title = Like(`%${search}%`);
-    }
-
-    if (isActive !== undefined) {
-      whereCondition.isActive = isActive;
     }
 
     const [quizzes, total] = await this.quizRepository.findAndCount({
@@ -181,13 +266,14 @@ export class QuizService {
     });
 
     // Images are now at question level
-    const transformedQuizzes = quizzes.map(quiz => ({
+    const transformedQuizzes = quizzes.map((quiz) => ({
       ...quiz,
-      images: []
+      images: [],
+      quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
     }));
 
     const totalPages = Math.ceil(total / limit);
-    
+
     return {
       items: transformedQuizzes,
       pagination: {
@@ -197,7 +283,7 @@ export class QuizService {
         totalItems: total,
         hasNext: page < totalPages,
         hasPrevious: page > 1,
-      }
+      },
     };
   }
 
@@ -214,7 +300,10 @@ export class QuizService {
     sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const skip = (page - 1) * limit;
-    
+
+    // Get user information for filtering
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
     // Build query based on user role
     const queryBuilder = this.quizRepository
       .createQueryBuilder('quiz')
@@ -225,24 +314,40 @@ export class QuizService {
     // Superadmin sees all quizzes
     if (userRole === 'superadmin') {
       // No additional filtering needed
-    } 
+    }
     // Admin sees only assigned quizzes
     else if (userRole === 'admin') {
       queryBuilder
         .innerJoin('quiz.userAssignments', 'userAssignments')
         .where('userAssignments.userId = :userId', { userId })
-        .andWhere('userAssignments.isActive = :isAssignmentActive', { isAssignmentActive: true });
+        .andWhere('userAssignments.isActive = :isAssignmentActive', {
+          isAssignmentActive: true,
+        });
     }
-    // Regular users see published quizzes only
+    // Regular users see published and active quizzes only
     else {
-      queryBuilder.where('quiz.isPublished = :isPublished', { isPublished: true });
+      queryBuilder
+        .where('quiz.isPublished = :isPublished', { isPublished: true })
+        .andWhere('quiz.isActive = :isActiveQuiz', { isActiveQuiz: true });
+
+      // For regular users, apply user's service and location restrictions
+      if (user?.serviceKey) {
+        queryBuilder.andWhere('quiz.serviceKey = :userServiceKey', {
+          userServiceKey: user.serviceKey,
+        });
+      }
+      if (user?.locationKey) {
+        queryBuilder.andWhere('quiz.locationKey = :userLocationKey', {
+          userLocationKey: user.locationKey,
+        });
+      }
     }
 
     // Apply search filter
     if (search) {
       queryBuilder.andWhere(
         '(UPPER(quiz.title) LIKE UPPER(:search) OR UPPER(quiz.description) LIKE UPPER(:search))',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -251,20 +356,38 @@ export class QuizService {
       queryBuilder.andWhere('quiz.isActive = :isActive', { isActive });
     }
 
-    // Apply service filter
-    if (serviceKey) {
+    // Apply service filter (ignore "all_services" and similar values)
+    if (
+      serviceKey &&
+      serviceKey !== 'all_services' &&
+      !serviceKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('quiz.serviceKey = :serviceKey', { serviceKey });
     }
 
-    // Apply location filter
-    if (locationKey) {
+    // Apply location filter (ignore "all_locations" and similar values)
+    if (
+      locationKey &&
+      locationKey !== 'all_locations' &&
+      !locationKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('quiz.locationKey = :locationKey', { locationKey });
     }
 
     // Validate sortBy field to prevent SQL injection
-    const allowedSortFields = ['title', 'startDateTime', 'endDateTime', 'createdAt', 'updatedAt', 'passingScore'];
-    const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
-    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
+    const allowedSortFields = [
+      'title',
+      'startDateTime',
+      'endDateTime',
+      'createdAt',
+      'updatedAt',
+      'passingScore',
+    ];
+    const validSortBy = allowedSortFields.includes(sortBy)
+      ? sortBy
+      : 'createdAt';
+    const validSortOrder =
+      sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
 
     // Apply pagination and ordering
     const [quizzes, total] = await queryBuilder
@@ -274,13 +397,14 @@ export class QuizService {
       .getManyAndCount();
 
     // Images are now at question level
-    const transformedQuizzes = quizzes.map(quiz => ({
+    const transformedQuizzes = quizzes.map((quiz) => ({
       ...quiz,
-      images: []
+      images: [],
+      quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
     }));
 
     const totalPages = Math.ceil(total / limit);
-    
+
     return {
       items: transformedQuizzes,
       pagination: {
@@ -290,13 +414,19 @@ export class QuizService {
         totalItems: total,
         hasNext: page < totalPages,
         hasPrevious: page > 1,
-      }
+      },
     };
   }
 
   async findOne(id: number): Promise<QuizDetailResponseDto> {
     const quiz = await this.quizRepository.findOne({
       where: { id },
+      relations: ['questions', 'scoringTemplates'],
+      order: {
+        questions: {
+          order: 'ASC',
+        },
+      },
     });
 
     if (!quiz) {
@@ -310,7 +440,7 @@ export class QuizService {
       order: { createdAt: 'DESC' },
     });
 
-    const assignedUsers = assignments.map(assignment => ({
+    const assignedUsers = assignments.map((assignment) => ({
       id: assignment.user.id,
       name: assignment.user.name,
       email: assignment.user.email,
@@ -320,33 +450,41 @@ export class QuizService {
     }));
 
     // Transform questions to include options and correct answers
-    const questions = quiz.questions ? quiz.questions.map(question => ({
-      id: question.id,
-      questionText: question.questionText,
-      questionType: question.questionType,
-      isRequired: question.isRequired,
-      order: question.order,
-      points: question.points,
-      options: question.options,
-      correctAnswers: question.correctAnswers,
-    })) : [];
+    const questions = quiz.questions
+      ? quiz.questions.map((question) => ({
+          id: question.id,
+          questionText: question.questionText,
+          questionType: question.questionType,
+          order: question.order,
+          options: question.options,
+          correctAnswer: question.correctAnswer,
+        }))
+      : [];
 
     return {
       ...quiz,
       questions,
       assignedUsers,
+      quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
     } as QuizDetailResponseDto;
   }
 
-  async update(id: number, updateQuizDto: UpdateQuizDto): Promise<QuizDetailResponseDto> {
-    const quiz = await this.quizRepository.findOne({ where: { id } });
+  async update(
+    id: number,
+    updateQuizDto: UpdateQuizDto,
+    userInfo?: UserInfo,
+  ): Promise<QuizDetailResponseDto> {
+    const quiz = await this.quizRepository.findOne({
+      where: { id },
+      relations: ['attempts', 'questions', 'scoringTemplates'],
+    });
 
     if (!quiz) {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
     // Prepare update data excluding relational fields
-    const {scoringTemplates, ...quizData} = updateQuizDto;
+    const { scoringTemplates, questions, ...quizData } = updateQuizDto;
 
     // Update slug if title is changed
     if (updateQuizDto.title && updateQuizDto.title !== quiz.title) {
@@ -354,29 +492,102 @@ export class QuizService {
     }
 
     // Update quiz basic data
-    await this.quizRepository.update(id, quizData);
+    await this.quizRepository.update(id, {
+      ...quizData,
+      updatedBy: userInfo?.email || userInfo?.name || 'system',
+    });
 
+    // Handle questions update
+    if (questions !== undefined) {
+      // Check if quiz has attempts - cannot edit questions if quiz has been taken
+      if (quiz.attempts && quiz.attempts.length > 0) {
+        throw new BadRequestException(
+          'Cannot update questions for a quiz that has already been taken. ' +
+            'This ensures fairness and data integrity for existing quiz results.',
+        );
+      }
 
+      // Delete existing questions (cascade will delete related data)
+      if (quiz.questions && quiz.questions.length > 0) {
+        await this.questionRepository.delete({ quizId: id });
+      }
 
-    // Handle scoring templates update
+      // Create new questions
+      if (questions.length > 0) {
+        for (let i = 0; i < questions.length; i++) {
+          const questionData = questions[i];
+          
+          // Handle correctAnswer properly - now using correctAnswer (singular)
+          let correctAnswer = '';
+          if (questionData.correctAnswer) {
+            correctAnswer = String(questionData.correctAnswer).trim();
+          }
+          
+          // Essay questions don't need correct answers (check both questionType and correctAnswer content)
+          const isEssayQuestion = questionData.questionType === 'essay' || 
+                                 questionData.questionType === 'text' || 
+                                 correctAnswer === 'essay';
+          
+          if (!isEssayQuestion && !correctAnswer) {
+            throw new BadRequestException(`Question ${i + 1}: correctAnswer is required and cannot be empty`);
+          }
+          
+          // For essay questions, clear the correctAnswer
+          if (isEssayQuestion) {
+            correctAnswer = '';
+          }
+
+          // Convert questionType to match enum values
+          let questionType: string = questionData.questionType;
+          if (questionType === 'essay') {
+            questionType = 'text'; // Map essay to text
+          } else if (questionType.includes('_')) {
+            questionType = questionType.replace('_', '-'); // Convert multiple_choice to multiple-choice
+          }
+
+          const question = this.questionRepository.create({
+            quizId: id,
+            questionText: questionData.questionText,
+            questionType: questionType as any,
+            options: questionData.options || [],
+            correctAnswer: correctAnswer,
+            order: questionData.order || i + 1,
+          });
+
+          const savedQuestion = await this.questionRepository.save(question);
+          console.log(`Updated question ${i + 1}:`, {
+            id: savedQuestion.id,
+            correctAnswer: savedQuestion.correctAnswer,
+            questionText: savedQuestion.questionText.substring(0, 50) + '...'
+          });
+        }
+      }
+    }
+
+    // Handle scoring templates update (grade range)
     if (scoringTemplates !== undefined) {
       // Delete existing scoring templates
       await this.quizScoringRepository.delete({ quizId: id });
-      
+
       // Create new scoring templates if provided
       if (scoringTemplates.length > 0) {
-        const newScoringTemplates = scoringTemplates.map(templateData =>
+        const newScoringTemplates = scoringTemplates.map((templateData) =>
           this.quizScoringRepository.create({
             quizId: id,
-            scoringName: templateData.grade || 'Updated Template',
-            correctAnswerPoints: templateData.maxScore || 10,
+            scoringName: templateData.grade || 'Updated Grade',
+            correctAnswerPoints: 1, // 1 point per jawaban benar (standard)
             incorrectAnswerPenalty: 0,
             unansweredPenalty: 0,
             bonusPoints: 0,
             multiplier: 1.0,
             timeBonusEnabled: false,
+            maxScore: templateData.maxScore, // Max score untuk grade ini (dalam %)
+            minScore: templateData.minScore, // Min score untuk grade ini (dalam %)
+            passingScore: updateQuizDto.passingScore,
             isActive: true,
-          })
+            createdBy: userInfo?.email || userInfo?.name || 'system',
+            updatedBy: userInfo?.email || userInfo?.name || 'system',
+          }),
         );
         await this.quizScoringRepository.save(newScoringTemplates);
       }
@@ -385,6 +596,61 @@ export class QuizService {
     // Auto-assignment will be triggered automatically by service/location changes
     // No manual assignment handling needed since we use auto-assignment only
 
+    return this.findOne(id);
+  }
+
+  async publish(id: number): Promise<QuizDetailResponseDto> {
+    const quiz = await this.quizRepository.findOne({ 
+      where: { id },
+      relations: ['questions', 'scoringTemplates']
+    });
+
+    if (!quiz) {
+      throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
+    }
+
+    // Validation: Quiz must have at least one question
+    if (!quiz.questions || quiz.questions.length === 0) {
+      throw new BadRequestException('Quiz tidak dapat dipublish karena belum memiliki soal. Silakan tambahkan minimal satu soal terlebih dahulu.');
+    }
+
+    // Validation: Quiz must have at least one scoring template
+    if (!quiz.scoringTemplates || quiz.scoringTemplates.length === 0) {
+      throw new BadRequestException('Quiz tidak dapat dipublish karena belum memiliki template penilaian. Silakan tambahkan template penilaian terlebih dahulu.');
+    }
+
+    // Generate URLs when publishing (same as generate link)
+    let updateData: any = { 
+      isPublished: true, 
+      isActive: true 
+    };
+
+    // Generate URLs if not already generated
+    if (!quiz.normalUrl || !quiz.shortUrl) {
+      if (quiz.slug && quiz.token) {
+        const urls = await this.urlGeneratorService.generateQuizUrls(
+          quiz.slug, 
+          quiz.token, 
+          quiz.id
+        );
+        
+        updateData.normalUrl = urls.normalUrl;
+        updateData.shortUrl = urls.shortUrl;
+      }
+    }
+
+    await this.quizRepository.update(id, updateData);
+    return this.findOne(id);
+  }
+
+  async unpublish(id: number): Promise<QuizDetailResponseDto> {
+    const quiz = await this.quizRepository.findOne({ where: { id } });
+
+    if (!quiz) {
+      throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
+    }
+
+    await this.quizRepository.update(id, { isPublished: false, isActive: false });
     return this.findOne(id);
   }
 
@@ -422,87 +688,21 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    return quiz.attempts.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    return quiz.attempts.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }
 
-  async duplicate(id: number): Promise<QuizResponseDto> {
-    const originalQuiz = await this.quizRepository.findOne({
-      where: { id },
-      relations: ['questions'],
-    });
 
-    if (!originalQuiz) {
-      throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
-    }
 
-    const duplicatedQuiz = this.quizRepository.create({
-      title: `${originalQuiz.title} (Copy)`,
-      description: originalQuiz.description,
-      slug: generateSlug(`${originalQuiz.title} (Copy)`),
-      token: generateToken(),
-      isActive: false, // Start as inactive
-      serviceType: originalQuiz.serviceType,
-      serviceKey: originalQuiz.serviceKey,
-      locationKey: originalQuiz.locationKey,
-      passingScore: originalQuiz.passingScore,
-      questionsPerPage: originalQuiz.questionsPerPage,
-      startDateTime: originalQuiz.startDateTime,
-      endDateTime: originalQuiz.endDateTime,
-    });
 
-    const savedQuiz = await this.quizRepository.save(duplicatedQuiz);
 
-    // Duplicate questions
-    for (const question of originalQuiz.questions) {
-      const duplicatedQuestion = this.questionRepository.create({
-        quizId: savedQuiz.id,
-        questionText: question.questionText,
-        questionType: question.questionType,
-        options: question.options,
-        correctAnswer: question.correctAnswer,
-        order: question.order,
-      });
-      await this.questionRepository.save(duplicatedQuestion);
-    }
-
-    return this.findOne(savedQuiz.id);
-  }
-
-  async publish(id: number): Promise<QuizResponseDto> {
-    const quiz = await this.quizRepository.findOne({ where: { id } });
-
-    if (!quiz) {
-      throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
-    }
-
-    // Generate URLs when publishing (same as generate link)
-    let updateData: any = { 
-      isPublished: true, 
-      isActive: true 
-    };
-
-    // Generate URLs if not already generated
-    if (!quiz.normalUrl || !quiz.shortUrl) {
-      if (quiz.slug && quiz.token) {
-        const urlAlias = this.urlGeneratorService.generateUrlAlias(quiz.title);
-        const urls = await this.urlGeneratorService.generateQuizUrls(
-          quiz.slug, 
-          quiz.token, 
-          urlAlias
-        );
-        
-        updateData.normalUrl = urls.normalUrl;
-        updateData.shortUrl = urls.shortUrl;
-      }
-    }
-
-    await this.quizRepository.update(id, updateData);
-    return this.findOne(id);
-  }
-
-  async generateLink(id: number): Promise<{
+  async generateLink(
+    id: number,
+    customAlias?: string,
+    userInfo?: UserInfo,
+  ): Promise<{
     normalUrl: string;
     shortUrl: string;
   }> {
@@ -512,349 +712,231 @@ export class QuizService {
       throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
     }
 
-    // Generate URLs
-    if (quiz.slug && quiz.token) {
-      const urlAlias = this.urlGeneratorService.generateUrlAlias(quiz.title);
+    // Always regenerate token for new link (based on datetime)
+    const newToken = generateUniqueToken();
+    
+    console.log(`=== REGENERATE LINK FOR QUIZ ${id} ===`);
+    console.log('Old token:', quiz.token);
+    console.log('New token:', newToken);
+    console.log('=========================================');
+
+    // Generate URLs with new token
+    if (quiz.slug) {
       const urls = await this.urlGeneratorService.generateQuizUrls(
-        quiz.slug, 
-        quiz.token, 
-        urlAlias
+        quiz.slug,
+        newToken,
+        quiz.id,
+        customAlias, // Pass custom alias if provided
       );
-      
-      // Update quiz with generated URLs and publish it
+
+      // Update quiz with new token and URLs, and publish it
       await this.quizRepository.update(id, {
+        token: newToken,
         normalUrl: urls.normalUrl,
         shortUrl: urls.shortUrl,
         isPublished: true,
         isActive: true,
+        updatedBy: userInfo?.email || userInfo?.name || 'system',
       });
-      
+
       return urls;
     } else {
-      throw new BadRequestException('Quiz must have slug and token to generate link');
+      throw new BadRequestException(
+        'Quiz must have slug to generate link',
+      );
     }
   }
 
-  async unpublish(id: number): Promise<QuizResponseDto> {
-    const quiz = await this.quizRepository.findOne({ where: { id } });
 
-    if (!quiz) {
-      throw new NotFoundException(ERROR_MESSAGES.QUIZ_NOT_FOUND);
-    }
-
-    await this.quizRepository.update(id, { isPublished: false, isActive: false });
-    return this.findOne(id);
-  }
 
   async findByToken(token: string): Promise<Quiz | null> {
     return this.quizRepository.findOne({
       where: { token, isActive: true },
-      relations: ['questions', 'images', 'scoringTemplates'],
+      relations: ['questions', 'scoringTemplates'],
     });
   }
 
-  // Image management methods (akan dipanggil dari quiz controller)
-  async uploadQuizImage(quizId: number, imageData: { imageUrl: string; altText?: string; order?: number }) {
-    const quiz = await this.findOne(quizId);
-    if (!quiz) {
-      throw new NotFoundException('Quiz not found');
-    }
-
-    // TODO: Implement image URL association with quiz
-    // For now, just validate the quiz exists and return success
-    // Images will be handled via external file server URLs in quiz metadata or separate table
-    
-    console.log(`Image associated with quiz ${quizId}:`, imageData);
-
-    // Return updated quiz (for now without actual image data)
-    return this.findOne(quizId);
-  }
-
-  // Scoring calculation method (akan dipanggil saat submit test)
-  async calculateScore(quizId: number, correctAnswers: number, totalQuestions: number) {
+  // Scoring calculation method (dipanggil saat submit test)
+  async calculateScore(
+    quizId: number,
+    correctAnswers: number,
+    totalQuestions: number,
+  ) {
     const quiz = await this.quizRepository.findOne({
       where: { id: quizId },
       relations: ['scoringTemplates'],
     });
 
     if (!quiz) {
-      throw new NotFoundException('Quiz not found');
+      throw new NotFoundException('Quiz tidak ditemukan');
     }
 
-    const score = Math.round((correctAnswers / totalQuestions) * 100);
-    
-    // Cari grade berdasarkan scoring templates
-    let grade = 'F';
-    let gradeDescription = 'Below expectations';
+    // Hitung persentase skor
+    const percentageScore =
+      totalQuestions > 0
+        ? Math.round((correctAnswers / totalQuestions) * 100)
+        : 0;
+
+    // Cari scoring template berdasarkan jumlah jawaban benar
+    let score = 0;
+    let gradeName = '';
+    let gradeDescription = `${correctAnswers} Benar`;
 
     if (quiz.scoringTemplates && quiz.scoringTemplates.length > 0) {
-      const matchingTemplate = quiz.scoringTemplates.find(template => 
-        score >= template.minScore && score <= template.maxScore
+      // Mode scoring template: Cari berdasarkan JUMLAH BENAR
+      // Logika: cari template yang sesuai dengan jumlah jawaban benar
+      const matchingTemplate = quiz.scoringTemplates.find(
+        (template) => template.scoringName === `${correctAnswers} Benar`
       );
-      
+
       if (matchingTemplate) {
-        grade = matchingTemplate.grade;
-        gradeDescription = matchingTemplate.description;
+        gradeName = matchingTemplate.scoringName; // "X Benar"
+        score = matchingTemplate.minScore; // Nilai dari minScore (yang sebenarnya adalah score value)
+        gradeDescription = gradeName;
+      } else {
+        // Jika tidak ada template yang cocok, gunakan format default
+        gradeName = `${correctAnswers} Benar`;
+        score = correctAnswers; // Gunakan jumlah benar sebagai score
+        gradeDescription = gradeName;
       }
     } else {
-      // Default grading jika tidak ada template
-      if (score >= quiz.passingScore) {
-        grade = score >= 90 ? 'A' : score >= 80 ? 'B' : 'C';
-        gradeDescription = score >= 90 ? 'Excellent' : score >= 80 ? 'Good' : 'Satisfactory';
-      }
+      // Mode default: gunakan jumlah benar
+      gradeName = `${correctAnswers} Benar`;
+      score = correctAnswers;
+      gradeDescription = gradeName;
     }
 
+    // Tentukan apakah lulus berdasarkan passing score
+    const passed = score >= quiz.passingScore;
+
     return {
-      score,
-      grade,
-      gradeDescription,
-      passed: score >= quiz.passingScore,
+      score: score, // Nilai akhir dari scoring template
+      percentageScore, // Persentase untuk referensi
+      gradeDescription, // Deskripsi berformat "X Benar"
+      passed,
       passingScore: quiz.passingScore,
-    };
-  }
-
-  // Template management methods
-  async getQuizTemplates(
-    page: number = 1,
-    limit: number = 10,
-    search?: string,
-    serviceType?: ServiceType,
-  ) {
-    const skip = (page - 1) * limit;
-    const whereCondition: any = {
-      isPublished: true, // Only published quizzes can be used as templates
-    };
-
-    if (search) {
-      whereCondition.title = Like(`%${search}%`);
-    }
-
-    if (serviceType) {
-      whereCondition.serviceType = serviceType;
-    }
-
-    const [quizzes, total] = await this.quizRepository.findAndCount({
-      where: whereCondition,
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-      relations: ['questions', 'images', 'scoringTemplates'],
-    });
-
-    const totalPages = Math.ceil(total / limit);
-    
-    return {
-      items: quizzes,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        pageSize: limit,
-        totalItems: total,
-        hasNext: page < totalPages,
-        hasPrevious: page > 1,
-      }
-    };
-  }
-
-  async getQuizTemplatePreview(id: number) {
-    const quiz = await this.quizRepository.findOne({
-      where: { id },
-      relations: [
-        'questions', 
-        'images', 
-        'scoringTemplates'
-      ],
-    });
-
-    if (!quiz) {
-      throw new NotFoundException('Quiz template not found');
-    }
-
-    // Return detailed preview with statistics
-    return {
-      ...quiz,
-      statistics: {
-        totalQuestions: quiz.questions?.length || 0,
-        totalImages: 0, // Images are now at question level
-        scoringRulesCount: quiz.scoringTemplates?.length || 0,
-        hasTimeLimit: !!quiz.durationMinutes,
+      correctAnswers,
+      totalQuestions,
+      detail: {
+        benar: correctAnswers,
+        salah: totalQuestions - correctAnswers,
+        total: totalQuestions,
+        scoringName: gradeName, // Nama dari scoring template
+        sistemPenilaian:
+          quiz.scoringTemplates && quiz.scoringTemplates.length > 0
+            ? 'Scoring Template'
+            : 'Jumlah Benar',
       },
     };
   }
 
-  async copyQuizTemplate(
-    sourceId: number, 
-    copyData: {
-      title: string;
-      description?: string;
-      serviceType?: ServiceType;
-      serviceKey?: string;
-      locationKey?: string;
-    }
-  ): Promise<QuizResponseDto> {
-    // Get source quiz with all relations
-    const sourceQuiz = await this.quizRepository.findOne({
-      where: { id: sourceId },
-      relations: ['questions', 'images', 'scoringTemplates'],
-    });
 
-    if (!sourceQuiz) {
-      throw new NotFoundException('Source quiz template not found');
-    }
-
-    try {
-      // Create new quiz based on template
-      const slug = generateSlug(copyData.title);
-      const token = generateToken();
-
-      const newQuiz = this.quizRepository.create({
-        title: copyData.title,
-        description: copyData.description || sourceQuiz.description,
-        slug,
-        token,
-        serviceType: copyData.serviceType || sourceQuiz.serviceType,
-        serviceKey: copyData.serviceKey || sourceQuiz.serviceKey,
-        locationKey: copyData.locationKey || sourceQuiz.locationKey,
-        
-        // Copy all settings from source
-        passingScore: sourceQuiz.passingScore,
-        questionsPerPage: sourceQuiz.questionsPerPage,
-        durationMinutes: sourceQuiz.durationMinutes,
-        
-        // Set as draft initially
-        isActive: true,
-        isPublished: false,
-        
-        // Copy date settings (admin can modify later)
-        startDateTime: sourceQuiz.startDateTime,
-        endDateTime: sourceQuiz.endDateTime,
-      });
-
-      const savedQuiz = await this.quizRepository.save(newQuiz);
-
-      // Copy questions (if any)
-      if (sourceQuiz.questions && sourceQuiz.questions.length > 0) {
-        const copiedQuestions = sourceQuiz.questions.map(question => ({
-          ...question,
-          id: undefined, // Let database generate new ID
-          quizId: savedQuiz.id,
-          quiz: savedQuiz,
-        }));
-
-        await this.questionRepository.save(copiedQuestions);
-      }
-
-      // Images are now handled at question level during question creation
-      
-      // TODO: Copy scoring templates (if any) - Based on current QuizScoring entity structure
-      if (sourceQuiz.scoringTemplates && sourceQuiz.scoringTemplates.length > 0) {
-        const copiedScoring = sourceQuiz.scoringTemplates.map(scoring => ({
-          quizId: savedQuiz.id,
-          scoringName: `${scoring.scoringName} (Copy)`,
-          correctAnswerPoints: scoring.correctAnswerPoints,
-          incorrectAnswerPenalty: scoring.incorrectAnswerPenalty,
-          unansweredPenalty: scoring.unansweredPenalty,
-          bonusPoints: scoring.bonusPoints,
-          multiplier: scoring.multiplier,
-          timeBonusEnabled: scoring.timeBonusEnabled,
-          timeBonusPerSecond: scoring.timeBonusPerSecond,
-          maxScore: scoring.maxScore,
-          minScore: scoring.minScore,
-          passingScore: scoring.passingScore,
-          isActive: scoring.isActive,
-        }));
-
-        await this.quizScoringRepository.save(copiedScoring);
-      }
-
-      // Return the complete new quiz with all relations
-      return this.findOne(savedQuiz.id);
-
-    } catch (error) {
-      throw new BadRequestException('Failed to copy quiz template: ' + error.message);
-    }
-  }
-
-  // Start manual quiz
-  async startManualQuiz(
-    quizId: number, 
-    startData?: { startDateTime?: string; durationMinutes?: number }
-  ): Promise<QuizResponseDto> {
-    // Get quiz
-    const quiz = await this.quizRepository.findOne({
-      where: { id: quizId },
-      relations: ['questions', 'images', 'scoringTemplates'],
-    });
-
-    if (!quiz) {
-      throw new NotFoundException('Quiz not found');
-    }
-
-
-
-    // Only allow manual start for MANUAL type quizzes
-    if (quiz.quizType !== QuizType.MANUAL) {
-      throw new BadRequestException('Only manual quizzes can be started manually. This quiz is scheduled.');
-    }
-
-    // Calculate start and end times
-    const startDateTime = startData?.startDateTime 
-      ? new Date(startData.startDateTime)
-      : new Date(); // Default to now
-
-    const durationMinutes = startData?.durationMinutes || quiz.durationMinutes;
-    
-    if (!durationMinutes) {
-      throw new BadRequestException('Duration is required for manual quiz start');
-    }
-
-    const endDateTime = new Date(startDateTime.getTime() + (durationMinutes * 60 * 1000));
-
-    // Update quiz with start/end times and publish it
-    await this.quizRepository.update(quizId, {
-      startDateTime,
-      endDateTime,
-      durationMinutes,
-      isPublished: true,
-    });
-
-    // Return updated quiz
-    return this.findOne(quizId);
-  }
 
   async findByTokenPublic(token: string): Promise<QuizResponseDto> {
     const quiz = await this.quizRepository.findOne({
-      where: { 
+      where: {
         token,
         isActive: true,
-        isPublished: true // Only published quizzes are accessible publicly
+        isPublished: true, // Only published quizzes are accessible publicly
       },
-      relations: ['questions', 'images', 'scoringTemplates'],
+      relations: ['questions', 'scoringTemplates'],
     });
 
     if (!quiz) {
-      throw new NotFoundException('Quiz not found or not published for public access');
+      throw new NotFoundException(
+        'Quiz not found or not published for public access',
+      );
     }
-
-    // Check if quiz is currently accessible
-    if (quiz.quizType === 'scheduled') {
-      const now = new Date();
-      if (quiz.startDateTime && quiz.endDateTime) {
-        if (now < quiz.startDateTime) {
-          throw new BadRequestException('Quiz has not started yet');
-        }
-        if (now > quiz.endDateTime) {
-          throw new BadRequestException('Quiz has already ended');
-        }
-      }
-    }
-
     // Images are now handled at question level
+    // Remove correctAnswer from questions for public access (security)
+    const publicQuestions = quiz.questions?.map(q => {
+      const { correctAnswer, ...questionWithoutAnswer } = q;
+      return questionWithoutAnswer;
+    });
+
     const transformedQuiz = {
       ...quiz,
-      images: [] // Images are now at question level
+      questions: publicQuestions, // Questions without correct answers
+      images: [], // Images are now at question level
+      quizLink: quiz.shortUrl || quiz.normalUrl || quiz.quizLink, // Prioritize shortUrl (TinyURL)
     };
 
     return transformedQuiz;
+  }
+
+  async getQuizzesWithMappings(
+    userId: number,
+    userRole: string,
+    page: number = 1,
+    limit: number = 10,
+    serviceKey?: string,
+    locationKey?: string,
+  ) {
+    // Get quiz data using existing method
+    const quizData = await this.findAllForUser(
+      userId,
+      userRole,
+      page,
+      limit,
+      undefined,
+      undefined,
+      serviceKey,
+      locationKey,
+    );
+
+    // Get config mappings
+    const mappings = await this.configService.getMappings();
+
+    // Simply return combined data without complex mapping for now
+    return {
+      ...quizData,
+      mappings: mappings,
+    };
+  }
+
+  async findAllForUserWithDisplayNames(
+    userId: number,
+    userRole: string,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    isActive?: boolean,
+    serviceKey?: string,
+    locationKey?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ) {
+    // Get quiz data using existing method
+    const quizData = await this.findAllForUser(
+      userId,
+      userRole,
+      page,
+      limit,
+      search,
+      isActive,
+      serviceKey,
+      locationKey,
+      sortBy,
+      sortOrder,
+    );
+
+    // Get config mappings
+    const mappings = await this.configService.getMappings();
+
+    // Enhance quiz data with display names
+    const enhancedQuizzes = quizData.items.map((quiz) => ({
+      ...quiz,
+      serviceName: quiz.serviceKey
+        ? mappings.services.mapping[quiz.serviceKey] || quiz.serviceKey
+        : null,
+      locationName: quiz.locationKey
+        ? mappings.locations.mapping[quiz.locationKey] || quiz.locationKey
+        : null,
+    }));
+
+    return {
+      items: enhancedQuizzes,
+      pagination: quizData.pagination,
+    };
   }
 }

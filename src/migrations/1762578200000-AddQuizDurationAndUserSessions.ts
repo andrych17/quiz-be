@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddQuizDurationAndUserSessions1762578200000 implements MigrationInterface {
+export class AddQuizDurationAndUserSessions1762578200000
+  implements MigrationInterface
+{
   name = 'AddQuizDurationAndUserSessions1762578200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -38,10 +40,18 @@ export class AddQuizDurationAndUserSessions1762578200000 implements MigrationInt
     `);
 
     // Create indexes
-    await queryRunner.query(`CREATE INDEX "IDX_user_quiz_sessions_user_quiz" ON "user_quiz_sessions" ("userId", "quizId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_quiz_sessions_status" ON "user_quiz_sessions" ("sessionStatus")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_quiz_sessions_expires" ON "user_quiz_sessions" ("expiresAt")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_quiz_sessions_email" ON "user_quiz_sessions" ("userEmail")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_quiz_sessions_user_quiz" ON "user_quiz_sessions" ("userId", "quizId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_quiz_sessions_status" ON "user_quiz_sessions" ("sessionStatus")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_quiz_sessions_expires" ON "user_quiz_sessions" ("expiresAt")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_quiz_sessions_email" ON "user_quiz_sessions" ("userEmail")`,
+    );
 
     // Add foreign key constraints
     await queryRunner.query(`
@@ -66,14 +76,26 @@ export class AddQuizDurationAndUserSessions1762578200000 implements MigrationInt
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_unique_active_session"`);
 
     // Drop foreign key constraints
-    await queryRunner.query(`ALTER TABLE "user_quiz_sessions" DROP CONSTRAINT IF EXISTS "FK_user_quiz_sessions_quiz"`);
-    await queryRunner.query(`ALTER TABLE "user_quiz_sessions" DROP CONSTRAINT IF EXISTS "FK_user_quiz_sessions_user"`);
+    await queryRunner.query(
+      `ALTER TABLE "user_quiz_sessions" DROP CONSTRAINT IF EXISTS "FK_user_quiz_sessions_quiz"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_quiz_sessions" DROP CONSTRAINT IF EXISTS "FK_user_quiz_sessions_user"`,
+    );
 
     // Drop indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_quiz_sessions_email"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_quiz_sessions_expires"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_quiz_sessions_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_quiz_sessions_user_quiz"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_quiz_sessions_email"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_quiz_sessions_expires"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_quiz_sessions_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_quiz_sessions_user_quiz"`,
+    );
 
     // Drop table
     await queryRunner.query(`DROP TABLE "user_quiz_sessions"`);
@@ -82,6 +104,8 @@ export class AddQuizDurationAndUserSessions1762578200000 implements MigrationInt
     await queryRunner.query(`DROP TYPE "session_status"`);
 
     // Remove duration column from quizzes
-    await queryRunner.query(`ALTER TABLE "quizzes" DROP COLUMN "durationMinutes"`);
+    await queryRunner.query(
+      `ALTER TABLE "quizzes" DROP COLUMN "durationMinutes"`,
+    );
   }
 }

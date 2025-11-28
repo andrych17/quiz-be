@@ -21,18 +21,23 @@ export class AttemptAnswer {
   @Column()
   questionId: number;
 
-  @Column('text')
-  answer: string;
+  @Column({ name: 'answerText', type: 'text' })
+  answerText: string;
 
-  @Column({ default: false })
-  isCorrect: boolean;
+  @Column({ name: 'selectedOption', nullable: true })
+  selectedOption: number;
+
+  @Column({ type: 'jsonb', name: 'selectedOptions', nullable: true })
+  selectedOptions: number[];
 
   // Relations
-  @ManyToOne(() => Attempt, 'answers', { onDelete: 'CASCADE' })
+  @ManyToOne(() => Attempt, (attempt) => attempt.answers, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'attemptId' })
   attempt: Attempt;
 
-  @ManyToOne(() => Question, (question) => question.answers, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Question, (question) => question.answers, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'questionId' })
   question: Question;
 }

@@ -27,8 +27,12 @@ export class CreateQuizScoringTable1762578150000 implements MigrationInterface {
     `);
 
     // Create indexes
-    await queryRunner.query(`CREATE INDEX "IDX_quiz_scoring_quiz_id" ON "quiz_scoring" ("quizId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_quiz_scoring_is_active" ON "quiz_scoring" ("isActive")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_quiz_scoring_quiz_id" ON "quiz_scoring" ("quizId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_quiz_scoring_is_active" ON "quiz_scoring" ("isActive")`,
+    );
 
     // Add foreign key constraints
     await queryRunner.query(`
@@ -39,12 +43,16 @@ export class CreateQuizScoringTable1762578150000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign key constraint
-    await queryRunner.query(`ALTER TABLE "quiz_scoring" DROP CONSTRAINT "FK_quiz_scoring_quiz"`);
-    
+    await queryRunner.query(
+      `ALTER TABLE "quiz_scoring" DROP CONSTRAINT "FK_quiz_scoring_quiz"`,
+    );
+
     // Drop indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_quiz_scoring_is_active"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_quiz_scoring_is_active"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_quiz_scoring_quiz_id"`);
-    
+
     // Drop table
     await queryRunner.query(`DROP TABLE "quiz_scoring"`);
   }

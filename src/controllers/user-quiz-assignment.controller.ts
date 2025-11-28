@@ -22,7 +22,10 @@ import {
 import { UserQuizAssignmentService } from '../services/user-quiz-assignment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
-import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import {
+  ApiResponse as StdApiResponse,
+  ResponseFactory,
+} from '../interfaces/api-response.interface';
 
 export class CreateUserQuizAssignmentDto {
   userId: number;
@@ -64,8 +67,16 @@ export class UserQuizAssignmentController {
     @Body() createDto: CreateUserQuizAssignmentDto,
     @Request() req: any,
   ): Promise<StdApiResponse<UserQuizAssignmentResponseDto>> {
-    const result = await this.userQuizAssignmentService.create(createDto, req.user.username);
-    return ResponseFactory.success(result, 'User-quiz assignment created successfully', undefined, HttpStatus.CREATED);
+    const result = await this.userQuizAssignmentService.create(
+      createDto,
+      req.user.username,
+    );
+    return ResponseFactory.success(
+      result,
+      'User-quiz assignment created successfully',
+      undefined,
+      HttpStatus.CREATED,
+    );
   }
 
   @Get()
@@ -87,7 +98,13 @@ export class UserQuizAssignmentController {
     @Query('quizId') quizId?: number,
     @Query('isActive') isActive?: boolean,
   ) {
-    return this.userQuizAssignmentService.findAll(page, limit, userId, quizId, isActive);
+    return this.userQuizAssignmentService.findAll(
+      page,
+      limit,
+      userId,
+      quizId,
+      isActive,
+    );
   }
 
   @Get('user/:userId/quizzes')
@@ -107,7 +124,12 @@ export class UserQuizAssignmentController {
     @Query('limit') limit: number = 10,
     @Query('isActive') isActive?: boolean,
   ) {
-    return this.userQuizAssignmentService.findUserQuizzes(userId, page, limit, isActive);
+    return this.userQuizAssignmentService.findUserQuizzes(
+      userId,
+      page,
+      limit,
+      isActive,
+    );
   }
 
   @Get('quiz/:quizId/users')
@@ -127,7 +149,12 @@ export class UserQuizAssignmentController {
     @Query('limit') limit: number = 10,
     @Query('isActive') isActive?: boolean,
   ) {
-    return this.userQuizAssignmentService.findQuizUsers(quizId, page, limit, isActive);
+    return this.userQuizAssignmentService.findQuizUsers(
+      quizId,
+      page,
+      limit,
+      isActive,
+    );
   }
 
   @Delete(':id')
@@ -141,6 +168,9 @@ export class UserQuizAssignmentController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<StdApiResponse<void>> {
     await this.userQuizAssignmentService.remove(id);
-    return ResponseFactory.success(undefined, 'User-quiz assignment removed successfully');
+    return ResponseFactory.success(
+      undefined,
+      'User-quiz assignment removed successfully',
+    );
   }
 }

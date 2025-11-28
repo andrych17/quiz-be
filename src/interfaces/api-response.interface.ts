@@ -50,7 +50,7 @@ export class ResponseFactory {
     data: T,
     message: string = 'Operation successful',
     metadata?: ResponseMetadata,
-    statusCode: number = 200
+    statusCode: number = 200,
   ): ApiResponse<T> {
     return {
       success: true,
@@ -66,7 +66,7 @@ export class ResponseFactory {
     message: string,
     errors?: ValidationError[],
     statusCode: number = 400,
-    path?: string
+    path?: string,
   ): ApiResponse<null> {
     return {
       success: false,
@@ -83,10 +83,10 @@ export class ResponseFactory {
     total: number,
     page: number,
     limit: number,
-    message: string = 'Data retrieved successfully'
+    message: string = 'Data retrieved successfully',
   ): ApiResponse<PaginatedResponse<T>> {
     const totalPages = Math.ceil(total / limit);
-    
+
     const pagination: PaginationMetadata = {
       currentPage: page,
       totalPages,

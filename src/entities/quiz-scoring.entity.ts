@@ -68,7 +68,9 @@ export class QuizScoring {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => Quiz, quiz => quiz.scoringTemplates, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Quiz, (quiz) => quiz.scoringTemplates, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'quizId' })
   quiz: Quiz;
 }

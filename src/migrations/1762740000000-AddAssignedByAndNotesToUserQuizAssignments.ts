@@ -1,7 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddAssignedByAndNotesToUserQuizAssignments1762740000000 implements MigrationInterface {
-  name = 'AddAssignedByAndNotesToUserQuizAssignments1762740000000'
+export class AddAssignedByAndNotesToUserQuizAssignments1762740000000
+  implements MigrationInterface
+{
+  name = 'AddAssignedByAndNotesToUserQuizAssignments1762740000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add assignedBy and notes columns if they do not already exist
@@ -30,12 +32,20 @@ export class AddAssignedByAndNotesToUserQuizAssignments1762740000000 implements 
     `);
 
     // Ensure indexes or defaults if needed (no-op for now)
-    console.log('✅ Added assignedBy and notes columns to user_quiz_assignments (if they were missing)');
+    console.log(
+      '✅ Added assignedBy and notes columns to user_quiz_assignments (if they were missing)',
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "user_quiz_assignments" DROP COLUMN IF EXISTS "assignedBy";`);
-    await queryRunner.query(`ALTER TABLE "user_quiz_assignments" DROP COLUMN IF EXISTS "notes";`);
-    console.log('✅ Rolled back assignedBy and notes columns on user_quiz_assignments');
+    await queryRunner.query(
+      `ALTER TABLE "user_quiz_assignments" DROP COLUMN IF EXISTS "assignedBy";`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_quiz_assignments" DROP COLUMN IF EXISTS "notes";`,
+    );
+    console.log(
+      '✅ Rolled back assignedBy and notes columns on user_quiz_assignments',
+    );
   }
 }

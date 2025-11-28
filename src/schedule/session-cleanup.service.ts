@@ -14,7 +14,8 @@ export class SessionCleanupService {
     private readonly configService: ConfigService,
     private readonly sessionService: UserQuizSessionService,
   ) {
-    this.isEnabled = this.configService.get<string>('SCHEDULER_ENABLED') === 'true';
+    this.isEnabled =
+      this.configService.get<string>('SCHEDULER_ENABLED') === 'true';
     this.cleanupIntervalMinutes = parseInt(
       this.configService.get<string>('SESSION_CLEANUP_INTERVAL_MINUTES') || '5',
     );
@@ -50,7 +51,9 @@ export class SessionCleanupService {
 
       // Log statistics if any sessions were cleaned up
       if (cleanedUpCount > 0) {
-        this.logger.warn(`${cleanedUpCount} expired sessions were marked as expired`);
+        this.logger.warn(
+          `${cleanedUpCount} expired sessions were marked as expired`,
+        );
       }
     } catch (error) {
       this.logger.error('Error during session cleanup:', error);
@@ -94,7 +97,8 @@ export class SessionCleanupService {
   } {
     const nextRunTime = new Date();
     nextRunTime.setMinutes(
-      Math.ceil(nextRunTime.getMinutes() / this.cleanupIntervalMinutes) * this.cleanupIntervalMinutes,
+      Math.ceil(nextRunTime.getMinutes() / this.cleanupIntervalMinutes) *
+        this.cleanupIntervalMinutes,
     );
 
     return {
@@ -114,7 +118,7 @@ export class SessionCleanupService {
     try {
       // Get current active and expired session counts from all quizzes
       const activeSessions = await this.sessionService.getActiveSessions();
-      
+
       // For expired sessions, we'll need to query the repository directly
       // This is a simplified version - you might want to add more detailed stats
       return {

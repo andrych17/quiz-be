@@ -7,7 +7,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { ApiResponse, ResponseFactory, ValidationError } from '../interfaces/api-response.interface';
+import {
+  ApiResponse,
+  ResponseFactory,
+  ValidationError,
+} from '../interfaces/api-response.interface';
 
 /**
  * Global Exception Filter
@@ -35,7 +39,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const exceptionResponse = exception.getResponse();
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const responseObj = exceptionResponse as any;
-        
+
         if (responseObj.message) {
           if (Array.isArray(responseObj.message)) {
             // Validation pipe errors
@@ -55,7 +59,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       message = exception.message;
-      
+
       // Handle TypeORM errors
       if (exception.name === 'QueryFailedError') {
         status = HttpStatus.BAD_REQUEST;

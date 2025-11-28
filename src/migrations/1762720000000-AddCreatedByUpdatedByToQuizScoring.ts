@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddCreatedByUpdatedByToQuizScoring1762720000000 implements MigrationInterface {
+export class AddCreatedByUpdatedByToQuizScoring1762720000000
+  implements MigrationInterface
+{
   name = 'AddCreatedByUpdatedByToQuizScoring1762720000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

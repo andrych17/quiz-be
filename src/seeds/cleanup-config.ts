@@ -7,7 +7,7 @@ dotenv.config();
 
 async function cleanupConfig() {
   console.log('🧹 Starting config cleanup...');
-  
+
   // Create database connection configuration
   const dataSourceConfig = {
     type: 'postgres' as const,
@@ -20,25 +20,28 @@ async function cleanupConfig() {
     synchronize: false,
     logging: false,
   };
-  
+
   // Initialize database connection
   const dataSource = new DataSource(dataSourceConfig);
   await dataSource.initialize();
   console.log('✓ Database connection established');
-  
+
   const configRepository = dataSource.getRepository(ConfigItem);
-  
+
   try {
     // Get all config items that are NOT location or service
-    const configsToDelete = await configRepository.createQueryBuilder('config')
-      .where('config.group NOT IN (:...allowedGroups)', { allowedGroups: ['location', 'service'] })
+    const configsToDelete = await configRepository
+      .createQueryBuilder('config')
+      .where('config.group NOT IN (:...allowedGroups)', {
+        allowedGroups: ['location', 'service'],
+      })
       .getMany();
-    
+
     console.log(`Found ${configsToDelete.length} config items to delete:`);
-    configsToDelete.forEach(config => {
+    configsToDelete.forEach((config) => {
       console.log(`  - ${config.group}.${config.key}: ${config.value}`);
     });
-    
+
     if (configsToDelete.length > 0) {
       // Delete the configs
       await configRepository.remove(configsToDelete);
@@ -46,17 +49,16 @@ async function cleanupConfig() {
     } else {
       console.log('✅ No config items to delete');
     }
-    
+
     // Show remaining configs
     const remainingConfigs = await configRepository.find({
-      order: { group: 'ASC', order: 'ASC' }
+      order: { group: 'ASC', order: 'ASC' },
     });
-    
+
     console.log(`\n📋 Remaining config items (${remainingConfigs.length}):`);
-    remainingConfigs.forEach(config => {
+    remainingConfigs.forEach((config) => {
       console.log(`  - ${config.group}.${config.key}: ${config.value}`);
     });
-    
   } catch (error) {
     console.error('❌ Error during cleanup:', error);
   } finally {

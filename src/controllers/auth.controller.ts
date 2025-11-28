@@ -18,15 +18,18 @@ import {
 import { AuthService } from '../services/auth.service';
 import { LocalAuthGuard } from '../auth/local-auth.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { 
-  LoginDto, 
-  RegisterDto, 
-  AuthResponseDto, 
-  RefreshTokenDto, 
+import {
+  LoginDto,
+  RegisterDto,
+  AuthResponseDto,
+  RefreshTokenDto,
   ChangePasswordDto,
-  UpdateProfileDto 
+  UpdateProfileDto,
 } from '../dto/auth.dto';
-import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import {
+  ApiResponse as StdApiResponse,
+  ResponseFactory,
+} from '../interfaces/api-response.interface';
 
 @ApiTags('authentication')
 @Controller('api/auth')
@@ -46,7 +49,9 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Invalid credentials',
   })
-  async login(@Body() loginDto: LoginDto): Promise<StdApiResponse<AuthResponseDto>> {
+  async login(
+    @Body() loginDto: LoginDto,
+  ): Promise<StdApiResponse<AuthResponseDto>> {
     const result = await this.authService.login(loginDto);
     return ResponseFactory.success(result, 'Login successful');
   }
@@ -62,9 +67,16 @@ export class AuthController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Email already exists or validation error',
   })
-  async register(@Body() registerDto: RegisterDto): Promise<StdApiResponse<AuthResponseDto>> {
+  async register(
+    @Body() registerDto: RegisterDto,
+  ): Promise<StdApiResponse<AuthResponseDto>> {
     const result = await this.authService.register(registerDto);
-    return ResponseFactory.success(result, 'Registration successful', undefined, HttpStatus.CREATED);
+    return ResponseFactory.success(
+      result,
+      'Registration successful',
+      undefined,
+      HttpStatus.CREATED,
+    );
   }
 
   @Post('refresh')
@@ -78,8 +90,12 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED,
     description: 'Invalid refresh token',
   })
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto): Promise<StdApiResponse<AuthResponseDto>> {
-    const result = await this.authService.refreshToken(refreshTokenDto.refresh_token);
+  async refreshToken(
+    @Body() refreshTokenDto: RefreshTokenDto,
+  ): Promise<StdApiResponse<AuthResponseDto>> {
+    const result = await this.authService.refreshToken(
+      refreshTokenDto.refresh_token,
+    );
     return ResponseFactory.success(result, 'Token refreshed successfully');
   }
 
@@ -121,7 +137,10 @@ export class AuthController {
     @Request() req: any,
     @Body() updateProfileDto: UpdateProfileDto,
   ): Promise<StdApiResponse<any>> {
-    const result = await this.authService.updateProfile(req.user.id, updateProfileDto);
+    const result = await this.authService.updateProfile(
+      req.user.id,
+      updateProfileDto,
+    );
     return ResponseFactory.success(result, 'Profile updated successfully');
   }
 
@@ -145,7 +164,10 @@ export class AuthController {
     @Request() req: any,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<StdApiResponse<any>> {
-    const result = await this.authService.changePassword(req.user.id, changePasswordDto);
+    const result = await this.authService.changePassword(
+      req.user.id,
+      changePasswordDto,
+    );
     return ResponseFactory.success(result, 'Password changed successfully');
   }
 

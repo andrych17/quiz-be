@@ -2,17 +2,17 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ 
-    example: 'john@example.com', 
-    description: 'User email address' 
+  @ApiProperty({
+    example: 'john@example.com',
+    description: 'User email address',
   })
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ 
-    example: 'password123', 
-    description: 'User password' 
+  @ApiProperty({
+    example: 'password123',
+    description: 'User password',
   })
   @IsString()
   @IsNotEmpty()
@@ -21,24 +21,24 @@ export class LoginDto {
 }
 
 export class RegisterDto {
-  @ApiProperty({ 
-    example: 'John Doe', 
-    description: 'Full name of the user' 
+  @ApiProperty({
+    example: 'John Doe',
+    description: 'Full name of the user',
   })
   @IsNotEmpty()
   @IsString()
   name: string;
 
-  @ApiProperty({ 
-    example: 'john@example.com', 
-    description: 'Email address' 
+  @ApiProperty({
+    example: 'john@example.com',
+    description: 'Email address',
   })
   @IsEmail()
   email: string;
 
-  @ApiProperty({ 
-    example: 'password123', 
-    description: 'Password (min 6 characters)' 
+  @ApiProperty({
+    example: 'password123',
+    description: 'Password (min 6 characters)',
   })
   @IsNotEmpty()
   @MinLength(6)
@@ -46,27 +46,27 @@ export class RegisterDto {
 }
 
 export class AuthResponseDto {
-  @ApiProperty({ 
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', 
-    description: 'JWT access token' 
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description: 'JWT access token',
   })
   access_token: string;
 
-  @ApiProperty({ 
-    example: 'Bearer', 
-    description: 'Token type' 
+  @ApiProperty({
+    example: 'Bearer',
+    description: 'Token type',
   })
   token_type: string;
 
-  @ApiProperty({ 
-    example: 86400, 
-    description: 'Token expiration time in seconds' 
+  @ApiProperty({
+    example: 86400,
+    description: 'Token expiration time in seconds',
   })
   expires_in: number;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'User information',
-    type: Object
+    type: Object,
   })
   user: {
     id: number;
@@ -77,9 +77,9 @@ export class AuthResponseDto {
 }
 
 export class RefreshTokenDto {
-  @ApiProperty({ 
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', 
-    description: 'Refresh token' 
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description: 'Refresh token',
   })
   @IsNotEmpty()
   @IsString()
@@ -87,17 +87,17 @@ export class RefreshTokenDto {
 }
 
 export class ChangePasswordDto {
-  @ApiProperty({ 
-    example: 'oldpassword123', 
-    description: 'Current password' 
+  @ApiProperty({
+    example: 'oldpassword123',
+    description: 'Current password',
   })
   @IsNotEmpty()
   @IsString()
   currentPassword: string;
 
-  @ApiProperty({ 
-    example: 'newpassword123', 
-    description: 'New password (min 6 characters)' 
+  @ApiProperty({
+    example: 'newpassword123',
+    description: 'New password (min 6 characters)',
   })
   @IsNotEmpty()
   @MinLength(6)
@@ -105,34 +105,34 @@ export class ChangePasswordDto {
 }
 
 export class UpdateProfileDto {
-  @ApiProperty({ 
-    example: 'John Doe Updated', 
+  @ApiProperty({
+    example: 'John Doe Updated',
     description: 'Updated full name',
-    required: false 
+    required: false,
   })
   @IsString()
   name?: string;
 
-  @ApiProperty({ 
-    example: 'newemail@example.com', 
+  @ApiProperty({
+    example: 'newemail@example.com',
     description: 'Updated email address',
-    required: false 
+    required: false,
   })
   @IsEmail()
   email?: string;
 
-  @ApiProperty({ 
-    example: 'currentpassword123', 
+  @ApiProperty({
+    example: 'currentpassword123',
     description: 'Current password (required when updating email or password)',
-    required: false 
+    required: false,
   })
   @IsString()
   currentPassword?: string;
 
-  @ApiProperty({ 
-    example: 'newpassword123', 
+  @ApiProperty({
+    example: 'newpassword123',
     description: 'New password (min 6 characters)',
-    required: false 
+    required: false,
   })
   @MinLength(6)
   newPassword?: string;

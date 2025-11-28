@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsEnum, IsArray } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+  IsEnum,
+  IsArray,
+  IsBoolean,
+} from 'class-validator';
 
 export enum UserRole {
   SUPERADMIN = 'superadmin',
@@ -17,71 +26,119 @@ export class CreateUserDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'password123', description: 'Password (min 6 characters)' })
+  @ApiProperty({
+    example: 'password123',
+    description: 'Password (min 6 characters)',
+  })
   @IsNotEmpty()
   @MinLength(6)
   password: string;
 
-  @ApiPropertyOptional({ 
-    example: 'admin', 
-    description: 'User role', 
+  @ApiPropertyOptional({
+    example: 'admin',
+    description: 'User role',
     enum: UserRole,
-    enumName: 'UserRole'
+    enumName: 'UserRole',
   })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items' })
+  @ApiPropertyOptional({
+    example: 'jakarta_pusat',
+    description: 'Location key from config items',
+  })
   @IsOptional()
   @IsString()
   locationKey?: string;
 
-  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({
+    example: 'sm',
+    description: 'Service key from config items (SM, AM, dll)',
+  })
   @IsOptional()
   @IsString()
   serviceKey?: string;
 
+  @ApiPropertyOptional({
+    example: true,
+    description: 'User active status',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 
+  @ApiPropertyOptional({
+    description:
+      'Service details (will be ignored during creation, use serviceKey instead)',
+  })
+  @IsOptional()
+  service?: any;
+
+  @ApiPropertyOptional({
+    description:
+      'Location details (will be ignored during creation, use locationKey instead)',
+  })
+  @IsOptional()
+  location?: any;
 }
 
 export class UpdateUserDto {
-  @ApiPropertyOptional({ example: 'Jane Doe', description: 'Full name of the user' })
+  @ApiPropertyOptional({
+    example: 'Jane Doe',
+    description: 'Full name of the user',
+  })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ example: 'jane@example.com', description: 'Email address' })
+  @ApiPropertyOptional({
+    example: 'jane@example.com',
+    description: 'Email address',
+  })
   @IsOptional()
   @IsEmail()
   email?: string;
 
-  @ApiPropertyOptional({ example: 'newpassword123', description: 'New password (min 6 characters)' })
+  @ApiPropertyOptional({
+    example: 'newpassword123',
+    description: 'New password (min 6 characters)',
+  })
   @IsOptional()
   @MinLength(6)
   password?: string;
 
-  @ApiPropertyOptional({ 
-    example: 'admin', 
-    description: 'User role', 
+  @ApiPropertyOptional({
+    example: 'admin',
+    description: 'User role',
     enum: UserRole,
-    enumName: 'UserRole'
+    enumName: 'UserRole',
   })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items' })
+  @ApiPropertyOptional({
+    example: 'jakarta_pusat',
+    description: 'Location key from config items',
+  })
   @IsOptional()
   @IsString()
   locationKey?: string;
 
-  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({
+    example: 'sm',
+    description: 'Service key from config items (SM, AM, dll)',
+  })
   @IsOptional()
   @IsString()
   serviceKey?: string;
 
-
+  @ApiPropertyOptional({ example: true, description: 'User active status' })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class UserResponseDto {
@@ -100,25 +157,37 @@ export class UserResponseDto {
   @ApiPropertyOptional({ example: 'sm', description: 'Service key' })
   serviceKey?: string;
 
-  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key' })
+  @ApiPropertyOptional({
+    example: 'jakarta_pusat',
+    description: 'Location key',
+  })
   locationKey?: string;
 
-  @ApiPropertyOptional({ 
-    example: { id: 1, key: 'sm', value: 'Service Management' }, 
-    description: 'Service details' 
+  @ApiPropertyOptional({
+    example: { id: 1, key: 'sm', value: 'Service Management' },
+    description: 'Service details',
   })
   service?: any;
 
-  @ApiPropertyOptional({ 
-    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' }, 
-    description: 'Location details' 
+  @ApiPropertyOptional({
+    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' },
+    description: 'Location details',
   })
   location?: any;
 
-  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
+  @ApiProperty({ example: true, description: 'User active status' })
+  isActive: boolean;
+
+  @ApiProperty({
+    example: '2024-01-01T00:00:00.000Z',
+    description: 'Creation date',
+  })
   createdAt: Date;
 
-  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
+  @ApiProperty({
+    example: '2024-01-01T00:00:00.000Z',
+    description: 'Last update date',
+  })
   updatedAt: Date;
 }
 
@@ -138,30 +207,43 @@ export class UserDetailResponseDto {
   @ApiPropertyOptional({ example: 'sm', description: 'Service key' })
   serviceKey?: string;
 
-  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key' })
+  @ApiPropertyOptional({
+    example: 'jakarta_pusat',
+    description: 'Location key',
+  })
   locationKey?: string;
 
-  @ApiPropertyOptional({ 
-    example: { id: 1, key: 'sm', value: 'Service Management' }, 
-    description: 'Service details' 
+  @ApiPropertyOptional({
+    example: { id: 1, key: 'sm', value: 'Service Management' },
+    description: 'Service details',
   })
   service?: any;
 
-  @ApiPropertyOptional({ 
-    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' }, 
-    description: 'Location details' 
+  @ApiPropertyOptional({
+    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' },
+    description: 'Location details',
   })
   location?: any;
 
-  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
+  @ApiProperty({ example: true, description: 'User active status' })
+  isActive: boolean;
+
+  @ApiProperty({
+    example: '2024-01-01T00:00:00.000Z',
+    description: 'Creation date',
+  })
   createdAt: Date;
 
-  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
+  @ApiProperty({
+    example: '2024-01-01T00:00:00.000Z',
+    description: 'Last update date',
+  })
   updatedAt: Date;
 
-  @ApiPropertyOptional({ 
-    type: 'array', 
-    description: 'Assigned quizzes (auto-assigned based on service and location)',
+  @ApiPropertyOptional({
+    type: 'array',
+    description:
+      'Assigned quizzes (auto-assigned based on service and location)',
     items: {
       type: 'object',
       properties: {
@@ -174,9 +256,12 @@ export class UserDetailResponseDto {
         startDateTime: { type: 'string', format: 'date-time' },
         endDateTime: { type: 'string', format: 'date-time' },
         createdAt: { type: 'string', format: 'date-time' },
-        assignmentType: { type: 'string', description: 'Assignment type (auto/manual)' }
-      }
-    }
+        assignmentType: {
+          type: 'string',
+          description: 'Assignment type (auto/manual)',
+        },
+      },
+    },
   })
   assignedQuizzes?: any[];
 }

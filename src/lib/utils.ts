@@ -16,13 +16,32 @@ export function generateSlug(text: string): string {
  * Generate a random token for quiz access
  */
 export function generateToken(length: number = 12): string {
-  return crypto.randomBytes(length).toString('hex').substring(0, length).toUpperCase();
+  return crypto
+    .randomBytes(length)
+    .toString('hex')
+    .substring(0, length)
+    .toUpperCase();
+}
+
+/**
+ * Generate a unique token based on datetime + random for quiz regeneration
+ */
+export function generateUniqueToken(): string {
+  const timestamp = Date.now();
+  const random = crypto.randomBytes(6).toString('hex').toUpperCase();
+  // Combine timestamp (last 8 digits) + random (first 4 chars)
+  const timestampPart = timestamp.toString().slice(-8);
+  const randomPart = random.substring(0, 4);
+  return `${randomPart}${timestampPart}`;
 }
 
 /**
  * Calculate quiz score based on correct answers
  */
-export function calculateScore(totalQuestions: number, correctAnswers: number): number {
+export function calculateScore(
+  totalQuestions: number,
+  correctAnswers: number,
+): number {
   if (totalQuestions === 0) return 0;
   return Math.round((correctAnswers / totalQuestions) * 100);
 }
@@ -54,7 +73,7 @@ export function generateUniqueFileName(originalName: string): string {
   const extension = originalName.split('.').pop();
   const nameWithoutExtension = originalName.replace(/\.[^/.]+$/, '');
   const sanitizedName = sanitizeFileName(nameWithoutExtension);
-  
+
   return `${sanitizedName}_${timestamp}_${random}.${extension}`;
 }
 
@@ -116,15 +135,17 @@ export function deepClone<T>(obj: T): T {
 /**
  * Remove undefined/null values from object
  */
-export function removeEmptyValues(obj: Record<string, any>): Record<string, any> {
+export function removeEmptyValues(
+  obj: Record<string, any>,
+): Record<string, any> {
   const result: Record<string, any> = {};
-  
+
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined && value !== null && value !== '') {
       result[key] = value;
     }
   }
-  
+
   return result;
 }
 
@@ -132,12 +153,13 @@ export function removeEmptyValues(obj: Record<string, any>): Record<string, any>
  * Generate random string
  */
 export function generateRandomString(length: number = 8): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
-  
+
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  
+
   return result;
 }

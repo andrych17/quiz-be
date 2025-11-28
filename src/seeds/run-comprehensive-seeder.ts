@@ -3,7 +3,9 @@ import { ComprehensiveSeeder } from './comprehensive-seeder';
 import { dataSourceConfig } from '../config/database.config';
 
 async function runSeeder() {
-  console.log('🚀 Initializing database connection for comprehensive seeding...');
+  console.log(
+    '🚀 Initializing database connection for comprehensive seeding...',
+  );
 
   const dataSource = new DataSource(dataSourceConfig);
 
@@ -13,7 +15,7 @@ async function runSeeder() {
 
     const seeder = new ComprehensiveSeeder(dataSource);
     await seeder.run();
-    
+
     console.log('🎉 All seeding completed successfully!');
   } catch (error) {
     console.error('❌ Seeding failed:', error);

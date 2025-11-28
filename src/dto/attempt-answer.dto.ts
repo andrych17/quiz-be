@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsNumber, IsDateString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsDateString,
+} from 'class-validator';
 
 export class CreateAttemptAnswerDto {
   @ApiProperty({ example: 1, description: 'Attempt ID' })
@@ -12,12 +18,18 @@ export class CreateAttemptAnswerDto {
   @IsNumber()
   questionId: number;
 
-  @ApiProperty({ example: 'A', description: 'Selected answer (A, B, C, D, or text for open questions)' })
+  @ApiProperty({
+    example: 'A',
+    description: 'Selected answer (A, B, C, D, or text for open questions)',
+  })
   @IsNotEmpty()
   @IsString()
   selectedAnswer: string;
 
-  @ApiPropertyOptional({ example: '2024-01-01T10:30:00.000Z', description: 'When the answer was given' })
+  @ApiPropertyOptional({
+    example: '2024-01-01T10:30:00.000Z',
+    description: 'When the answer was given',
+  })
   @IsOptional()
   @IsDateString()
   answeredAt?: string;
@@ -29,7 +41,10 @@ export class UpdateAttemptAnswerDto {
   @IsString()
   selectedAnswer?: string;
 
-  @ApiPropertyOptional({ example: '2024-01-01T10:35:00.000Z', description: 'Updated answer timestamp' })
+  @ApiPropertyOptional({
+    example: '2024-01-01T10:35:00.000Z',
+    description: 'Updated answer timestamp',
+  })
   @IsOptional()
   @IsDateString()
   answeredAt?: string;
@@ -48,26 +63,29 @@ export class AttemptAnswerResponseDto {
   @ApiProperty({ example: 'A', description: 'Selected answer' })
   selectedAnswer: string;
 
-  @ApiProperty({ example: '2024-01-01T10:30:00.000Z', description: 'When the answer was given' })
+  @ApiProperty({
+    example: '2024-01-01T10:30:00.000Z',
+    description: 'When the answer was given',
+  })
   answeredAt: Date;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Question details',
     example: {
       id: 1,
       questionText: 'What is JavaScript?',
-      correctAnswer: 'A'
-    }
+      correctAnswer: 'A',
+    },
   })
   question?: any;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Attempt details',
     example: {
       id: 1,
       quizId: 1,
-      participantName: 'John Doe'
-    }
+      participantName: 'John Doe',
+    },
   })
   attempt?: any;
 }

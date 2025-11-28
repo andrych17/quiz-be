@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AttemptAnswer } from '../entities/attempt-answer.entity';
 import { Attempt } from '../entities/attempt.entity';
 import { Question } from '../entities/question.entity';
-import { CreateAttemptAnswerDto, UpdateAttemptAnswerDto } from '../dto/attempt-answer.dto';
+import {
+  CreateAttemptAnswerDto,
+  UpdateAttemptAnswerDto,
+} from '../dto/attempt-answer.dto';
 
 @Injectable()
 export class AttemptAnswerService {
@@ -17,27 +24,31 @@ export class AttemptAnswerService {
     private questionRepository: Repository<Question>,
   ) {}
 
-  async create(createAttemptAnswerDto: CreateAttemptAnswerDto): Promise<AttemptAnswer> {
+  async create(
+    createAttemptAnswerDto: CreateAttemptAnswerDto,
+  ): Promise<AttemptAnswer> {
     // Verify attempt exists
     const attempt = await this.attemptRepository.findOne({
       where: { id: createAttemptAnswerDto.attemptId },
     });
 
     if (!attempt) {
-      throw new NotFoundException(`Attempt with ID ${createAttemptAnswerDto.attemptId} not found`);
+      throw new NotFoundException(
+        `Attempt with ID ${createAttemptAnswerDto.attemptId} not found`,
+      );
     }
 
     // Verify question exists and belongs to the quiz
     const question = await this.questionRepository.findOne({
-      where: { 
+      where: {
         id: createAttemptAnswerDto.questionId,
-        quizId: attempt.quizId 
+        quizId: attempt.quizId,
       },
     });
 
     if (!question) {
       throw new NotFoundException(
-        `Question with ID ${createAttemptAnswerDto.questionId} not found in this quiz`
+        `Question with ID ${createAttemptAnswerDto.questionId} not found in this quiz`,
       );
     }
 
@@ -51,15 +62,14 @@ export class AttemptAnswerService {
 
     if (existingAnswer) {
       throw new BadRequestException(
-        `Answer already exists for attempt ${createAttemptAnswerDto.attemptId} and question ${createAttemptAnswerDto.questionId}`
+        `Answer already exists for attempt ${createAttemptAnswerDto.attemptId} and question ${createAttemptAnswerDto.questionId}`,
       );
     }
 
     const attemptAnswer = this.attemptAnswerRepository.create({
       attemptId: createAttemptAnswerDto.attemptId,
       questionId: createAttemptAnswerDto.questionId,
-      answer: createAttemptAnswerDto.selectedAnswer,
-      isCorrect: createAttemptAnswerDto.selectedAnswer === question.correctAnswer,
+      answerText: createAttemptAnswerDto.selectedAnswer,
     });
 
     return await this.attemptAnswerRepository.save(attemptAnswer);
@@ -73,8 +83,10 @@ export class AttemptAnswerService {
   }
 
   async findByAttemptId(attemptId: number): Promise<AttemptAnswer[]> {
-    const attempt = await this.attemptRepository.findOne({ where: { id: attemptId } });
-    
+    const attempt = await this.attemptRepository.findOne({
+      where: { id: attemptId },
+    });
+
     if (!attempt) {
       throw new NotFoundException(`Attempt with ID ${attemptId} not found`);
     }
@@ -87,8 +99,10 @@ export class AttemptAnswerService {
   }
 
   async findByQuestionId(questionId: number): Promise<AttemptAnswer[]> {
-    const question = await this.questionRepository.findOne({ where: { id: questionId } });
-    
+    const question = await this.questionRepository.findOne({
+      where: { id: questionId },
+    });
+
     if (!question) {
       throw new NotFoundException(`Question with ID ${questionId} not found`);
     }
@@ -113,15 +127,20 @@ export class AttemptAnswerService {
     return attemptAnswer;
   }
 
-  async update(id: number, updateAttemptAnswerDto: UpdateAttemptAnswerDto): Promise<AttemptAnswer> {
+  async update(
+    id: number,
+    updateAttemptAnswerDto: UpdateAttemptAnswerDto,
+  ): Promise<AttemptAnswer> {
     const attemptAnswer = await this.findOne(id);
 
     if (updateAttemptAnswerDto.selectedAnswer) {
-      attemptAnswer.answer = updateAttemptAnswerDto.selectedAnswer;
+      attemptAnswer.answerText = updateAttemptAnswerDto.selectedAnswer;
       // Recheck if answer is correct
-      const question = await this.questionRepository.findOne({ where: { id: attemptAnswer.questionId } });
+      const question = await this.questionRepository.findOne({
+        where: { id: attemptAnswer.questionId },
+      });
       if (question) {
-        attemptAnswer.isCorrect = updateAttemptAnswerDto.selectedAnswer === question.correctAnswer;
+        // isCorrect is calculated dynamically - no field to update
       }
     }
 
@@ -140,7 +159,10 @@ export class AttemptAnswerService {
     }
   }
 
-  async getAnswersByAttemptAndQuiz(attemptId: number, quizId: number): Promise<AttemptAnswer[]> {
+  async getAnswersByAttemptAndQuiz(
+    attemptId: number,
+    quizId: number,
+  ): Promise<AttemptAnswer[]> {
     return await this.attemptAnswerRepository
       .createQueryBuilder('aa')
       .innerJoin('aa.attempt', 'attempt')
@@ -168,8 +190,10 @@ export class AttemptAnswerService {
     incorrectAnswers: number;
     answerDistribution: { answer: string; count: number }[];
   }> {
-    const question = await this.questionRepository.findOne({ where: { id: questionId } });
-    
+    const question = await this.questionRepository.findOne({
+      where: { id: questionId },
+    });
+
     if (!question) {
       throw new NotFoundException(`Question with ID ${questionId} not found`);
     }
@@ -179,19 +203,24 @@ export class AttemptAnswerService {
     });
 
     const totalAnswers = answers.length;
-    const correctAnswers = answers.filter(a => a.answer === question.correctAnswer).length;
+    const correctAnswers = answers.filter(
+      (a) => a.answerText === question.correctAnswer,
+    ).length;
     const incorrectAnswers = totalAnswers - correctAnswers;
 
     // Calculate answer distribution
-    const distribution = answers.reduce((acc, answer) => {
-      const existing = acc.find(d => d.answer === answer.answer);
-      if (existing) {
-        existing.count++;
-      } else {
-        acc.push({ answer: answer.answer, count: 1 });
-      }
-      return acc;
-    }, [] as { answer: string; count: number }[]);
+    const distribution = answers.reduce(
+      (acc, answer) => {
+        const existing = acc.find((d) => d.answer === answer.answerText);
+        if (existing) {
+          existing.count++;
+        } else {
+          acc.push({ answer: answer.answerText, count: 1 });
+        }
+        return acc;
+      },
+      [] as { answer: string; count: number }[],
+    );
 
     return {
       totalAnswers,

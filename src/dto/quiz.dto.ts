@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsBoolean, IsDateString, IsNumber, IsEnum } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsDateString,
+  IsNumber,
+  IsEnum,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum ServiceType {
   SERVICE_MANAGEMENT = 'service-management',
@@ -14,9 +25,67 @@ export enum ServiceType {
   DEVOPS = 'devops',
 }
 
-export enum QuizType {
-  SCHEDULED = 'scheduled',
-  MANUAL = 'manual',
+export class CreateQuestionForQuizDto {
+  @ApiProperty({
+    example: 'What is the capital of France?',
+    description: 'Question text',
+  })
+  @IsNotEmpty()
+  @IsString()
+  questionText: string;
+
+  @ApiProperty({
+    example: 'multiple-choice',
+    description: 'Type of question',
+    enum: ['multiple-choice', 'multiple-select', 'text', 'true-false', 'essay'],
+  })
+  @IsNotEmpty()
+  @IsString()
+  questionType: 'multiple-choice' | 'multiple-select' | 'text' | 'true-false' | 'essay';
+
+  @ApiPropertyOptional({
+    example: ['Paris', 'London', 'Berlin', 'Madrid'],
+    description: 'Array of possible answers (not required for text questions)',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  options?: string[];
+
+  @ApiPropertyOptional({ example: 'Paris', description: 'Correct answer (optional for essay questions)' })
+  @IsOptional()
+  @IsString({ message: 'correctAnswer must be a string' })
+  correctAnswer?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'Question order in quiz' })
+  @IsOptional()
+  @IsNumber()
+  order?: number;
+}
+
+export class CreateScoringTemplateForQuizDto {
+  @ApiProperty({ example: 0, description: 'Minimum score for this grade' })
+  @IsNotEmpty()
+  @IsNumber()
+  minScore: number;
+
+  @ApiProperty({ example: 100, description: 'Maximum score for this grade' })
+  @IsNotEmpty()
+  @IsNumber()
+  maxScore: number;
+
+  @ApiProperty({ example: 'A', description: 'Grade label' })
+  @IsNotEmpty()
+  @IsString()
+  grade: string;
+
+  @ApiPropertyOptional({
+    example: 'Excellent performance',
+    description: 'Grade description',
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
 }
 
 export class CreateQuizDto {
@@ -25,153 +94,168 @@ export class CreateQuizDto {
   @IsString()
   title: string;
 
-  @ApiProperty({ example: 'Test your knowledge of JavaScript fundamentals', description: 'Quiz description' })
+  @ApiProperty({
+    example: 'Test your knowledge of JavaScript fundamentals',
+    description: 'Quiz description',
+  })
   @IsNotEmpty()
   @IsString()
   description: string;
 
-  @ApiProperty({ 
-    example: 'web-development', 
-    description: 'Service type for the quiz',
-    enum: ServiceType,
-    enumName: 'ServiceType'
-  })
-  @IsNotEmpty()
-  @IsEnum(ServiceType)
-  serviceType: ServiceType;
 
-  @ApiPropertyOptional({ 
-    example: 'scheduled', 
-    description: 'Quiz type: scheduled (has fixed schedule) or manual (started by admin)',
-    enum: QuizType,
-    enumName: 'QuizType',
-    default: QuizType.SCHEDULED
-  })
-  @IsOptional()
-  @IsEnum(QuizType)
-  quizType?: QuizType;
 
-  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items (location group)' })
+
+
+  @ApiPropertyOptional({
+    example: 'jakarta_pusat',
+    description: 'Location key from config items (location group)',
+  })
   @IsOptional()
   @IsString()
   locationKey?: string;
 
-  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({
+    example: 'sm',
+    description: 'Service key from config items (SM, AM, dll)',
+  })
   @IsOptional()
   @IsString()
   serviceKey?: string;
 
-  @ApiPropertyOptional({ example: 70, description: 'Passing score percentage (default: 70)' })
+  @ApiPropertyOptional({
+    example: 70,
+    description: 'Passing score percentage (default: 70)',
+  })
   @IsOptional()
   @IsNumber()
   passingScore?: number;
 
-  @ApiPropertyOptional({ example: 5, description: 'Questions per page (default: 5)' })
+  @ApiPropertyOptional({
+    example: 5,
+    description: 'Questions per page (default: 5)',
+  })
   @IsOptional()
   @IsNumber()
   questionsPerPage?: number;
 
-  @ApiPropertyOptional({ example: 120, description: 'Quiz duration in minutes (null = no time limit)' })
+  @ApiPropertyOptional({
+    example: 120,
+    description: 'Quiz duration in minutes (null = no time limit)',
+  })
   @IsOptional()
   @IsNumber()
   durationMinutes?: number;
 
-  @ApiPropertyOptional({ example: true, description: 'Whether the quiz is active' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the quiz is active',
+  })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ example: '2024-01-01T08:00:00.000Z', description: 'Quiz start date and time' })
+  @ApiPropertyOptional({
+    example: '2024-01-01T08:00:00.000Z',
+    description: 'Quiz start date and time',
+  })
   @IsOptional()
   @IsDateString()
   startDateTime?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz end date and time' })
+  @ApiPropertyOptional({
+    example: '2024-12-31T23:59:59.000Z',
+    description: 'Quiz end date and time',
+  })
   @IsOptional()
   @IsDateString()
   endDateTime?: string;
 
-  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing (legacy)' })
+  @ApiPropertyOptional({
+    example: 'https://quiz.gms.com/q/ABC123',
+    description: 'Short URL for public sharing (legacy)',
+  })
   @IsOptional()
   @IsString()
   quizLink?: string;
 
-  @ApiPropertyOptional({ example: 'https://quiz.gms.com/quiz/javascript-basics-ABC123', description: 'Normal URL for quiz access' })
+  @ApiPropertyOptional({
+    example: 'https://quiz.gms.com/quiz/javascript-basics-ABC123',
+    description: 'Normal URL for quiz access',
+  })
   @IsOptional()
   @IsString()
   normalUrl?: string;
 
-  @ApiPropertyOptional({ example: 'https://tinyurl.com/quiz-js-basics', description: 'Short URL for easy sharing' })
+  @ApiPropertyOptional({
+    example: 'https://tinyurl.com/quiz-js-basics',
+    description: 'Short URL for easy sharing',
+  })
   @IsOptional()
   @IsString()
   shortUrl?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Quiz scoring templates to create',
-    type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        minScore: { type: 'number' },
-        maxScore: { type: 'number' },
-        grade: { type: 'string' },
-        description: { type: 'string' }
-      }
-    }
+    type: [CreateScoringTemplateForQuizDto],
   })
   @IsOptional()
-  scoringTemplates?: Array<{
-    minScore: number;
-    maxScore: number;
-    grade: string;
-    description?: string;
-  }>;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateScoringTemplateForQuizDto)
+  scoringTemplates?: CreateScoringTemplateForQuizDto[];
 
-
+  @ApiPropertyOptional({
+    description: 'Questions to create for this quiz',
+    type: [CreateQuestionForQuizDto],
+  })
+  @IsOptional()
+  @IsArray({ message: 'questions must be an array' })
+  @ValidateNested({ each: true, message: 'Each question must be valid' })
+  @Type(() => CreateQuestionForQuizDto)
+  questions?: CreateQuestionForQuizDto[];
 }
 
 export class UpdateQuizDto {
-  @ApiPropertyOptional({ example: 'JavaScript Advanced', description: 'Quiz title' })
+  @ApiPropertyOptional({
+    example: 'JavaScript Advanced',
+    description: 'Quiz title',
+  })
   @IsOptional()
   @IsString()
   title?: string;
 
-  @ApiPropertyOptional({ example: 'Advanced JavaScript concepts', description: 'Quiz description' })
+  @ApiPropertyOptional({
+    example: 'Advanced JavaScript concepts',
+    description: 'Quiz description',
+  })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: 'javascript-advanced', description: 'URL slug (auto-generated from title)' })
+  @ApiPropertyOptional({
+    example: 'javascript-advanced',
+    description: 'URL slug (auto-generated from title)',
+  })
   @IsOptional()
   @IsString()
   slug?: string;
 
-  @ApiPropertyOptional({ 
-    example: 'web-development', 
-    description: 'Service type for the quiz',
-    enum: ServiceType,
-    enumName: 'ServiceType'
-  })
-  @IsOptional()
-  @IsEnum(ServiceType)
-  serviceType?: ServiceType;
 
-  @ApiPropertyOptional({ 
-    example: 'scheduled', 
-    description: 'Quiz type: scheduled (has fixed schedule) or manual (started by admin)',
-    enum: QuizType,
-    enumName: 'QuizType'
-  })
-  @IsOptional()
-  @IsEnum(QuizType)
-  quizType?: QuizType;
 
-  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key from config items (location group)' })
+
+
+  @ApiPropertyOptional({
+    example: 'jakarta_pusat',
+    description: 'Location key from config items (location group)',
+  })
   @IsOptional()
   @IsString()
   locationKey?: string;
 
-  @ApiPropertyOptional({ example: 'sm', description: 'Service key from config items (SM, AM, dll)' })
+  @ApiPropertyOptional({
+    example: 'sm',
+    description: 'Service key from config items (SM, AM, dll)',
+  })
   @IsOptional()
   @IsString()
   serviceKey?: string;
@@ -186,48 +270,67 @@ export class UpdateQuizDto {
   @IsNumber()
   questionsPerPage?: number;
 
-  @ApiPropertyOptional({ example: 90, description: 'Quiz duration in minutes (null = no time limit)' })
+  @ApiPropertyOptional({
+    example: 90,
+    description: 'Quiz duration in minutes (null = no time limit)',
+  })
   @IsOptional()
   @IsNumber()
   durationMinutes?: number;
 
-  @ApiPropertyOptional({ example: false, description: 'Whether the quiz is active' })
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether the quiz is active',
+  })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ example: true, description: 'Whether the quiz is published' })
-  @IsOptional()
-  @IsBoolean()
-  isPublished?: boolean;
 
-  @ApiPropertyOptional({ example: '2024-01-01T08:00:00.000Z', description: 'Quiz start date and time' })
+
+  @ApiPropertyOptional({
+    example: '2024-01-01T08:00:00.000Z',
+    description: 'Quiz start date and time',
+  })
   @IsOptional()
   @IsDateString()
   startDateTime?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz end date and time' })
+  @ApiPropertyOptional({
+    example: '2024-12-31T23:59:59.000Z',
+    description: 'Quiz end date and time',
+  })
   @IsOptional()
   @IsDateString()
   endDateTime?: string;
 
-  @ApiPropertyOptional({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing (legacy)' })
+  @ApiPropertyOptional({
+    example: 'https://quiz.gms.com/q/ABC123',
+    description: 'Short URL for public sharing (legacy)',
+  })
   @IsOptional()
   @IsString()
   quizLink?: string;
 
-  @ApiPropertyOptional({ example: 'https://quiz.gms.com/quiz/javascript-advanced-XYZ789', description: 'Normal URL for quiz access' })
+  @ApiPropertyOptional({
+    example: 'https://quiz.gms.com/quiz/javascript-advanced-XYZ789',
+    description: 'Normal URL for quiz access',
+  })
   @IsOptional()
   @IsString()
   normalUrl?: string;
 
-  @ApiPropertyOptional({ example: 'https://tinyurl.com/quiz-js-advanced', description: 'Short URL for easy sharing' })
+  @ApiPropertyOptional({
+    example: 'https://tinyurl.com/quiz-js-advanced',
+    description: 'Short URL for easy sharing',
+  })
   @IsOptional()
   @IsString()
   shortUrl?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Quiz scoring templates to update (will replace existing templates)',
+  @ApiPropertyOptional({
+    description:
+      'Quiz scoring templates to update (will replace existing templates)',
     type: 'array',
     items: {
       type: 'object',
@@ -236,9 +339,9 @@ export class UpdateQuizDto {
         minScore: { type: 'number' },
         maxScore: { type: 'number' },
         grade: { type: 'string' },
-        description: { type: 'string' }
-      }
-    }
+        description: { type: 'string' },
+      },
+    },
   })
   @IsOptional()
   scoringTemplates?: Array<{
@@ -249,7 +352,25 @@ export class UpdateQuizDto {
     description?: string;
   }>;
 
-
+  @ApiPropertyOptional({
+    description:
+      'Quiz questions to update (will replace existing questions if quiz has no attempts)',
+    type: 'array',
+  })
+  @IsOptional()
+  questions?: Array<{
+    questionText: string;
+    questionType: string; // Supports: 'multiple-choice', 'multiple-select', 'text', 'true-false', 'essay'
+    imageUrl?: string;
+    options: string[];
+    correctAnswer?: string; // Optional for essay questions
+    points: number;
+    order: number;
+    isRequired: boolean;
+    imageBase64?: string;
+    imageOriginalName?: string;
+    imageAltText?: string;
+  }>;
 }
 
 export class QuizResponseDto {
@@ -259,7 +380,10 @@ export class QuizResponseDto {
   @ApiProperty({ example: 'JavaScript Basics', description: 'Quiz title' })
   title: string;
 
-  @ApiProperty({ example: 'Test your knowledge of JavaScript fundamentals', description: 'Quiz description' })
+  @ApiProperty({
+    example: 'Test your knowledge of JavaScript fundamentals',
+    description: 'Quiz description',
+  })
   description: string;
 
   @ApiProperty({ example: 'javascript-basics', description: 'URL slug' })
@@ -268,27 +392,24 @@ export class QuizResponseDto {
   @ApiProperty({ example: 'ABC123DEF', description: 'Quiz token' })
   token: string;
 
-  @ApiProperty({ example: 'web-development', description: 'Service type' })
-  serviceType: ServiceType;
-
-  @ApiProperty({ example: 'scheduled', description: 'Quiz type (scheduled or manual)' })
-  quizType: QuizType;
-
-  @ApiPropertyOptional({ example: 'jakarta_pusat', description: 'Location key' })
+  @ApiPropertyOptional({
+    example: 'jakarta_pusat',
+    description: 'Location key',
+  })
   locationKey?: string;
 
-  @ApiPropertyOptional({ 
-    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' }, 
-    description: 'Location details' 
+  @ApiPropertyOptional({
+    example: { id: 1, key: 'jakarta_pusat', value: 'Jakarta Pusat' },
+    description: 'Location details',
   })
   location?: any;
 
   @ApiPropertyOptional({ example: 'sm', description: 'Service key' })
   serviceKey?: string;
 
-  @ApiPropertyOptional({ 
-    example: { id: 1, key: 'sm', value: 'Service Management' }, 
-    description: 'Service details' 
+  @ApiPropertyOptional({
+    example: { id: 1, key: 'sm', value: 'Service Management' },
+    description: 'Service details',
   })
   service?: any;
 
@@ -298,40 +419,69 @@ export class QuizResponseDto {
   @ApiProperty({ example: 5, description: 'Questions per page' })
   questionsPerPage: number;
 
-  @ApiPropertyOptional({ example: 120, description: 'Quiz duration in minutes (null = no time limit)' })
+  @ApiPropertyOptional({
+    example: 120,
+    description: 'Quiz duration in minutes (null = no time limit)',
+  })
   durationMinutes?: number;
 
   @ApiProperty({ example: true, description: 'Whether the quiz is active' })
   isActive: boolean;
 
-  @ApiProperty({ example: true, description: 'Whether the quiz is published' })
-  isPublished: boolean;
 
-  @ApiProperty({ example: '2024-01-01T08:00:00.000Z', description: 'Quiz start date and time' })
+
+  @ApiProperty({
+    example: '2024-01-01T08:00:00.000Z',
+    description: 'Quiz start date and time',
+  })
   startDateTime: Date;
 
-  @ApiProperty({ example: '2024-12-31T23:59:59.000Z', description: 'Quiz end date and time' })
+  @ApiProperty({
+    example: '2024-12-31T23:59:59.000Z',
+    description: 'Quiz end date and time',
+  })
   endDateTime: Date;
 
-  @ApiProperty({ example: 'https://quiz.gms.com/q/ABC123', description: 'Short URL for public sharing (legacy)' })
+  @ApiProperty({
+    example: 'https://quiz.gms.com/q/ABC123',
+    description: 'Short URL for public sharing (legacy)',
+  })
   quizLink: string;
 
-  @ApiPropertyOptional({ example: 'https://quiz.gms.com/quiz/javascript-basics-ABC123', description: 'Normal URL for quiz access' })
+  @ApiPropertyOptional({
+    example: 'https://quiz.gms.com/quiz/javascript-basics-ABC123',
+    description: 'Normal URL for quiz access',
+  })
   normalUrl?: string;
 
-  @ApiPropertyOptional({ example: 'https://tinyurl.com/quiz-js-basics', description: 'Short URL for easy sharing' })
+  @ApiPropertyOptional({
+    example: 'https://tinyurl.com/quiz-js-basics',
+    description: 'Short URL for easy sharing',
+  })
   shortUrl?: string;
 
   @ApiProperty({ example: 'admin@gms.com', description: 'Creator email' })
   createdBy: string;
 
-  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
+  @ApiPropertyOptional({
+    example: 'admin@gms.com',
+    description: 'Last updater email',
+  })
+  updatedBy?: string;
+
+  @ApiProperty({
+    example: '2024-01-01T00:00:00.000Z',
+    description: 'Creation date',
+  })
   createdAt: Date;
 
-  @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
+  @ApiProperty({
+    example: '2024-01-01T00:00:00.000Z',
+    description: 'Last update date',
+  })
   updatedAt: Date;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Quiz images',
     type: 'array',
     items: {
@@ -340,13 +490,13 @@ export class QuizResponseDto {
         id: { type: 'number' },
         imageUrl: { type: 'string' },
         altText: { type: 'string' },
-        order: { type: 'number' }
-      }
-    }
+        order: { type: 'number' },
+      },
+    },
   })
   images?: any[];
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Quiz scoring templates',
     type: 'array',
     items: {
@@ -356,15 +506,15 @@ export class QuizResponseDto {
         minScore: { type: 'number' },
         maxScore: { type: 'number' },
         grade: { type: 'string' },
-        description: { type: 'string' }
-      }
-    }
+        description: { type: 'string' },
+      },
+    },
   })
   scoringTemplates?: any[];
 }
 
 export class QuizDetailResponseDto extends QuizResponseDto {
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Quiz questions',
     type: 'array',
     items: {
@@ -377,13 +527,13 @@ export class QuizDetailResponseDto extends QuizResponseDto {
         order: { type: 'number' },
         points: { type: 'number' },
         options: { type: 'array' },
-        correctAnswers: { type: 'array' }
-      }
-    }
+        correctAnswers: { type: 'array' },
+      },
+    },
   })
   questions?: any[];
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Assigned users (auto-assigned based on service and location)',
     type: 'array',
     items: {
@@ -394,21 +544,30 @@ export class QuizDetailResponseDto extends QuizResponseDto {
         email: { type: 'string' },
         role: { type: 'string' },
         assignedAt: { type: 'string', format: 'date-time' },
-        assignmentType: { type: 'string', description: 'Assignment type (auto/manual)' },
-        isActive: { type: 'boolean' }
-      }
-    }
+        assignmentType: {
+          type: 'string',
+          description: 'Assignment type (auto/manual)',
+        },
+        isActive: { type: 'boolean' },
+      },
+    },
   })
   assignedUsers?: any[];
 }
 
 export class StartManualQuizDto {
-  @ApiPropertyOptional({ example: '2024-01-01T08:00:00.000Z', description: 'Custom start date and time (default: now)' })
+  @ApiPropertyOptional({
+    example: '2024-01-01T08:00:00.000Z',
+    description: 'Custom start date and time (default: now)',
+  })
   @IsOptional()
   @IsDateString()
   startDateTime?: string;
 
-  @ApiPropertyOptional({ example: 120, description: 'Override quiz duration in minutes' })
+  @ApiPropertyOptional({
+    example: 120,
+    description: 'Override quiz duration in minutes',
+  })
   @IsOptional()
   @IsNumber()
   durationMinutes?: number;

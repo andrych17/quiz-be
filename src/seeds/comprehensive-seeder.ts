@@ -1,7 +1,13 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { User, Quiz, Question, ConfigItem, UserQuizAssignment } from '../entities';
-import { ServiceType, QuizType } from '../dto/quiz.dto';
+import {
+  User,
+  Quiz,
+  Question,
+  ConfigItem,
+  UserQuizAssignment,
+} from '../entities';
+
 
 export class ComprehensiveSeeder {
   constructor(private dataSource: DataSource) {}
@@ -19,14 +25,16 @@ export class ComprehensiveSeeder {
 
   private async seedConfigItems(): Promise<void> {
     const configRepository = this.dataSource.getRepository(ConfigItem);
-    
+
     // Check if config items already exist
     const existingConfigs = await configRepository.count();
     if (existingConfigs > 0) {
-      console.log(`✓ Config items already exist (${existingConfigs} items), skipping seeding`);
+      console.log(
+        `✓ Config items already exist (${existingConfigs} items), skipping seeding`,
+      );
       return;
     }
-    
+
     const configs = [
       // App configs
       {
@@ -47,7 +55,7 @@ export class ComprehensiveSeeder {
         isActive: true,
         createdBy: 'system',
       },
-      
+
       // Service configs
       {
         group: 'service',
@@ -195,20 +203,22 @@ export class ComprehensiveSeeder {
   private async seedUsers(): Promise<void> {
     const userRepository = this.dataSource.getRepository(User);
     const configRepository = this.dataSource.getRepository(ConfigItem);
-    
+
     // Check if users already exist
     const existingUsers = await userRepository.count();
     if (existingUsers > 0) {
-      console.log(`✓ Users already exist (${existingUsers} users), skipping seeding`);
+      console.log(
+        `✓ Users already exist (${existingUsers} users), skipping seeding`,
+      );
       return;
     }
-    
+
     // No need to fetch config items anymore, we'll use keys directly
-    
+
     // Hash passwords
     const saltRounds = 10;
     const defaultPassword = await bcrypt.hash('password123', saltRounds);
-    
+
     const users = [
       // Superadmin
       {
@@ -222,7 +232,7 @@ export class ComprehensiveSeeder {
         createdBy: 'system',
         updatedBy: 'system',
       },
-      
+
       // Service Management Admins
       {
         email: 'admin.sm@gms.com',
@@ -257,7 +267,7 @@ export class ComprehensiveSeeder {
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
-      
+
       // Asset Management Admins
       {
         email: 'admin.am@gms.com',
@@ -292,7 +302,7 @@ export class ComprehensiveSeeder {
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
-      
+
       // Technical Support Admins
       {
         email: 'admin.tech@gms.com',
@@ -316,7 +326,7 @@ export class ComprehensiveSeeder {
         createdBy: 'superadmin@gms.com',
         updatedBy: 'superadmin@gms.com',
       },
-      
+
       // Regular Users
       {
         email: 'user1@gms.com',
@@ -360,22 +370,24 @@ export class ComprehensiveSeeder {
   private async seedQuizzes(): Promise<void> {
     const quizRepository = this.dataSource.getRepository(Quiz);
     const questionRepository = this.dataSource.getRepository(Question);
-    
+
     // Check if quizzes already exist
     const existingQuizzes = await quizRepository.count();
     if (existingQuizzes > 0) {
-      console.log(`✓ Quizzes already exist (${existingQuizzes} quizzes), skipping seeding`);
+      console.log(
+        `✓ Quizzes already exist (${existingQuizzes} quizzes), skipping seeding`,
+      );
       return;
     }
-    
+
     // Quiz 1: Service Management - Jakarta Pusat
     const smQuiz = quizRepository.create({
       title: 'Test Masuk Service Management Jakarta Pusat',
-      description: 'Test untuk seleksi masuk tim Service Management di Jakarta Pusat. Test ini mencakup pemahaman ITIL, service desk, dan manajemen layanan IT.',
+      description:
+        'Test untuk seleksi masuk tim Service Management di Jakarta Pusat. Test ini mencakup pemahaman ITIL, service desk, dan manajemen layanan IT.',
       slug: 'test-sm-jakarta-pusat',
       token: 'sm-jkt-pusat-2024',
-      serviceType: ServiceType.SERVICE_MANAGEMENT,
-      quizType: QuizType.SCHEDULED,
+
       serviceKey: 'sm',
       locationKey: 'jakarta_pusat',
       isPublished: true,
@@ -388,14 +400,15 @@ export class ComprehensiveSeeder {
       createdBy: 'admin.sm@gms.com',
     });
 
-    // Quiz 2: Asset Management - Jakarta Utara  
+    // Quiz 2: Asset Management - Jakarta Utara
     const amQuiz = quizRepository.create({
       title: 'Test Asset Management Jakarta Utara',
-      description: 'Test untuk seleksi masuk tim Asset Management di Jakarta Utara. Test ini mencakup pemahaman manajemen aset IT, inventarisasi, dan maintenance.',
+      description:
+        'Test untuk seleksi masuk tim Asset Management di Jakarta Utara. Test ini mencakup pemahaman manajemen aset IT, inventarisasi, dan maintenance.',
       slug: 'test-am-jakarta-utara',
       token: 'am-jkt-utara-2024',
-      serviceType: ServiceType.SYSTEM_ADMIN,
-      quizType: QuizType.SCHEDULED,
+
+
       serviceKey: 'am',
       locationKey: 'jakarta_utara',
       isPublished: true,
@@ -411,11 +424,12 @@ export class ComprehensiveSeeder {
     // Quiz 3: Technical Support - Jakarta Selatan
     const techQuiz = quizRepository.create({
       title: 'Test Technical Support Jakarta Selatan',
-      description: 'Test untuk seleksi masuk tim Technical Support di Jakarta Selatan. Test ini mencakup troubleshooting, customer service, dan technical knowledge.',
+      description:
+        'Test untuk seleksi masuk tim Technical Support di Jakarta Selatan. Test ini mencakup troubleshooting, customer service, dan technical knowledge.',
       slug: 'test-tech-jakarta-selatan',
       token: 'tech-jkt-selatan-2024',
-      serviceType: ServiceType.CYBERSECURITY,
-      quizType: QuizType.MANUAL,
+
+
       serviceKey: 'technical_support',
       locationKey: 'jakarta_selatan',
       isPublished: false,
@@ -436,15 +450,17 @@ export class ComprehensiveSeeder {
     const smQuestions = [
       {
         order: 1,
-        questionText: 'Apa yang dimaksud dengan Service Management dalam konteks IT?',
+        questionText:
+          'Apa yang dimaksud dengan Service Management dalam konteks IT?',
         questionType: 'multiple-choice' as const,
         options: [
           'Pengelolaan perangkat keras komputer',
           'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
           'Software untuk monitoring jaringan',
-          'Sistem keamanan IT'
+          'Sistem keamanan IT',
         ],
-        correctAnswer: 'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
+        correctAnswer:
+          'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
         points: 10,
         isRequired: true,
         quizId: savedSmQuiz.id,
@@ -452,13 +468,14 @@ export class ComprehensiveSeeder {
       },
       {
         order: 2,
-        questionText: 'ITIL adalah framework yang digunakan dalam Service Management. Apa kepanjangan dari ITIL?',
+        questionText:
+          'ITIL adalah framework yang digunakan dalam Service Management. Apa kepanjangan dari ITIL?',
         questionType: 'multiple-choice' as const,
         options: [
           'Information Technology Infrastructure Library',
           'Internet Technology Integration Logic',
           'IT Implementation and Learning',
-          'Information Technical Integration Library'
+          'Information Technical Integration Library',
         ],
         correctAnswer: 'Information Technology Infrastructure Library',
         points: 10,
@@ -476,9 +493,10 @@ export class ComprehensiveSeeder {
           'Service Transition',
           'Service Operation',
           'Continual Service Improvement',
-          'Service Development'
+          'Service Development',
         ],
-        correctAnswer: 'Service Strategy,Service Design,Service Transition,Service Operation,Continual Service Improvement',
+        correctAnswer:
+          'Service Strategy,Service Design,Service Transition,Service Operation,Continual Service Improvement',
         points: 15,
         isRequired: true,
         quizId: savedSmQuiz.id,
@@ -486,18 +504,20 @@ export class ComprehensiveSeeder {
       },
       {
         order: 4,
-        questionText: 'Jelaskan secara singkat apa itu Incident Management dalam ITIL.',
+        questionText:
+          'Jelaskan secara singkat apa itu Incident Management dalam ITIL.',
         questionType: 'text' as const,
         options: null,
-        correctAnswer: 'Proses untuk mengembalikan layanan IT normal secepat mungkin setelah terjadi gangguan dan meminimalkan dampak negatif terhadap operasi bisnis',
+        correctAnswer:
+          'Proses untuk mengembalikan layanan IT normal secepat mungkin setelah terjadi gangguan dan meminimalkan dampak negatif terhadap operasi bisnis',
         points: 15,
         isRequired: true,
         quizId: savedSmQuiz.id,
         createdBy: 'admin.sm@gms.com',
-      }
+      },
     ];
 
-    // Questions for AM Quiz  
+    // Questions for AM Quiz
     const amQuestions = [
       {
         order: 1,
@@ -507,7 +527,7 @@ export class ComprehensiveSeeder {
           'Mengurangi jumlah aset perusahaan',
           'Memaksimalkan nilai dan meminimalkan risiko aset',
           'Menjual aset secepat mungkin',
-          'Menyimpan aset di gudang'
+          'Menyimpan aset di gudang',
         ],
         correctAnswer: 'Memaksimalkan nilai dan meminimalkan risiko aset',
         points: 10,
@@ -521,11 +541,11 @@ export class ComprehensiveSeeder {
         questionType: 'multiple-select' as const,
         options: [
           'Planning',
-          'Procurement', 
+          'Procurement',
           'Deployment',
           'Maintenance',
           'Disposal',
-          'Marketing'
+          'Marketing',
         ],
         correctAnswer: 'Planning,Procurement,Deployment,Maintenance,Disposal',
         points: 15,
@@ -538,12 +558,13 @@ export class ComprehensiveSeeder {
         questionText: 'Apa itu Configuration Management Database (CMDB)?',
         questionType: 'text' as const,
         options: null,
-        correctAnswer: 'Database yang berisi informasi tentang semua Configuration Items (CI) dan hubungan antar CI dalam infrastruktur IT',
+        correctAnswer:
+          'Database yang berisi informasi tentang semua Configuration Items (CI) dan hubungan antar CI dalam infrastruktur IT',
         points: 15,
         isRequired: true,
         quizId: savedAmQuiz.id,
         createdBy: 'admin.am@gms.com',
-      }
+      },
     ];
 
     // Questions for Tech Quiz
@@ -556,7 +577,7 @@ export class ComprehensiveSeeder {
           'Restart sistem',
           'Identifikasi dan pahami masalah',
           'Ganti hardware',
-          'Install ulang software'
+          'Install ulang software',
         ],
         correctAnswer: 'Identifikasi dan pahami masalah',
         points: 10,
@@ -566,7 +587,8 @@ export class ComprehensiveSeeder {
       },
       {
         order: 2,
-        questionText: 'Pilih semua soft skills yang penting untuk Technical Support:',
+        questionText:
+          'Pilih semua soft skills yang penting untuk Technical Support:',
         questionType: 'multiple-select' as const,
         options: [
           'Komunikasi yang baik',
@@ -574,49 +596,61 @@ export class ComprehensiveSeeder {
           'Empati',
           'Problem solving',
           'Time management',
-          'Programming'
+          'Programming',
         ],
-        correctAnswer: 'Komunikasi yang baik,Kesabaran,Empati,Problem solving,Time management',
+        correctAnswer:
+          'Komunikasi yang baik,Kesabaran,Empati,Problem solving,Time management',
         points: 15,
         isRequired: true,
         quizId: savedTechQuiz.id,
         createdBy: 'admin.tech@gms.com',
-      }
+      },
     ];
 
-    await questionRepository.save([...smQuestions, ...amQuestions, ...techQuestions]);
-    
-    console.log(`✓ Seeded 3 quizzes with ${smQuestions.length + amQuestions.length + techQuestions.length} questions`);
+    await questionRepository.save([
+      ...smQuestions,
+      ...amQuestions,
+      ...techQuestions,
+    ]);
+
+    console.log(
+      `✓ Seeded 3 quizzes with ${smQuestions.length + amQuestions.length + techQuestions.length} questions`,
+    );
   }
 
   private async seedUserQuizAssignments(): Promise<void> {
-    const assignmentRepository = this.dataSource.getRepository(UserQuizAssignment);
+    const assignmentRepository =
+      this.dataSource.getRepository(UserQuizAssignment);
     const userRepository = this.dataSource.getRepository(User);
     const quizRepository = this.dataSource.getRepository(Quiz);
-    
+
     // Check if assignments already exist
     const existingAssignments = await assignmentRepository.count();
     if (existingAssignments > 0) {
-      console.log(`✓ User quiz assignments already exist (${existingAssignments} assignments), skipping seeding`);
+      console.log(
+        `✓ User quiz assignments already exist (${existingAssignments} assignments), skipping seeding`,
+      );
       return;
     }
-    
+
     // Get users and quizzes
     const smAdmins = await userRepository.find({
-      where: { role: 'admin' }
+      where: { role: 'admin' },
     });
-    
+
     const quizzes = await quizRepository.find();
-    
+
     const assignments = [];
-    
+
     // Auto-assign quizzes based on service and location match
     for (const admin of smAdmins) {
       if (admin.serviceKey && admin.locationKey) {
-        const matchingQuizzes = quizzes.filter(quiz => 
-          quiz.serviceKey === admin.serviceKey && quiz.locationKey === admin.locationKey
+        const matchingQuizzes = quizzes.filter(
+          (quiz) =>
+            quiz.serviceKey === admin.serviceKey &&
+            quiz.locationKey === admin.locationKey,
         );
-        
+
         for (const quiz of matchingQuizzes) {
           assignments.push({
             userId: admin.id,
@@ -630,7 +664,7 @@ export class ComprehensiveSeeder {
         }
       }
     }
-    
+
     if (assignments.length > 0) {
       await assignmentRepository.save(assignments);
       console.log(`✓ Seeded ${assignments.length} user quiz assignments`);

@@ -15,7 +15,7 @@ export enum SessionStatus {
   ACTIVE = 'active',
   PAUSED = 'paused',
   COMPLETED = 'completed',
-  EXPIRED = 'expired'
+  EXPIRED = 'expired',
 }
 
 @Entity('user_quiz_sessions')
@@ -38,7 +38,7 @@ export class UserQuizSession {
   @Column({
     type: 'enum',
     enum: SessionStatus,
-    default: SessionStatus.ACTIVE
+    default: SessionStatus.ACTIVE,
   })
   sessionStatus: SessionStatus;
 
@@ -98,18 +98,22 @@ export class UserQuizSession {
 
   get totalElapsedSeconds(): number {
     if (!this.startedAt) return 0;
-    
+
     const now = new Date();
     const start = new Date(this.startedAt);
-    
+
     if (this.completedAt) {
-      return Math.floor((new Date(this.completedAt).getTime() - start.getTime()) / 1000);
+      return Math.floor(
+        (new Date(this.completedAt).getTime() - start.getTime()) / 1000,
+      );
     }
-    
+
     if (this.sessionStatus === SessionStatus.PAUSED && this.pausedAt) {
-      return Math.floor((new Date(this.pausedAt).getTime() - start.getTime()) / 1000);
+      return Math.floor(
+        (new Date(this.pausedAt).getTime() - start.getTime()) / 1000,
+      );
     }
-    
+
     return Math.floor((now.getTime() - start.getTime()) / 1000);
   }
 }

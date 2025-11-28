@@ -9,6 +9,8 @@ import {
   Query,
   ParseIntPipe,
   HttpStatus,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,10 +18,20 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard, Roles } from '../auth/roles.guard';
 import { ConfigService } from '../services/config.service';
-import { CreateConfigItemDto, UpdateConfigItemDto, ConfigItemResponseDto } from '../dto/config.dto';
-import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import {
+  CreateConfigItemDto,
+  UpdateConfigItemDto,
+  ConfigItemResponseDto,
+} from '../dto/config.dto';
+import {
+  ApiResponse as StdApiResponse,
+  ResponseFactory,
+} from '../interfaces/api-response.interface';
 
 @ApiTags('config')
 @Controller('api/config')
@@ -27,15 +39,53 @@ export class ConfigController {
   constructor(private readonly configService: ConfigService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new configuration item' })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Config item created successfully',
     type: ConfigItemResponseDto,
   })
-  async create(@Body() createConfigItemDto: CreateConfigItemDto): Promise<StdApiResponse<ConfigItemResponseDto>> {
-    const result = await this.configService.create(createConfigItemDto);
-    return ResponseFactory.success(result, 'Config item created successfully', undefined, HttpStatus.CREATED);
+  async create(
+    @Body() createConfigItemDto: CreateConfigItemDto,
+    @Req() req: any,
+  ): Promise<StdApiResponse<any>> {
+    const userInfo = {
+      id: req.user?.id,
+      email: req.user?.email,
+      name: req.user?.name,
+      role: req.user?.role,
+    };
+    const result = await this.configService.create(
+      createConfigItemDto,
+      userInfo,
+    );
+
+    return {
+      success: result.success,
+      message: result.message,
+      data: result.success ? result.data : null,
+      timestamp: new Date().toISOString(),
+      statusCode: HttpStatus.OK,
+    };
+  }
+
+  @Get('ui-mappings')
+  @ApiOperation({
+    summary: 'Get key-value mappings for locations and services for UI',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Config mappings retrieved successfully',
+  })
+  async getMappings(): Promise<StdApiResponse<any>> {
+    const result = await this.configService.getMappings();
+    return ResponseFactory.success(
+      result,
+      'Config mappings retrieved successfully',
+    );
   }
 
   @Get()
@@ -43,8 +93,19 @@ export class ConfigController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'group', required: false, type: String })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (group, key, value, order, createdAt, updatedAt)' })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description:
+      'Sort by field (group, key, value, order, createdAt, updatedAt)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['ASC', 'DESC'],
+    description: 'Sort order',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Config items retrieved successfully',
@@ -56,8 +117,18 @@ export class ConfigController {
     @Query('group') group?: string,
     @Query('sortBy') sortBy: string = 'group',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'ASC',
-  ) {
-    return this.configService.findAll(page, limit, group, sortBy, sortOrder);
+  ): Promise<StdApiResponse<any>> {
+    const result = await this.configService.findAll(
+      page,
+      limit,
+      group,
+      sortBy,
+      sortOrder,
+    );
+    return ResponseFactory.success(
+      result,
+      'Config items retrieved successfully',
+    );
   }
 
   @Get('locations')
@@ -69,7 +140,10 @@ export class ConfigController {
   })
   async getLocations(): Promise<StdApiResponse<any>> {
     const result = await this.configService.getLocations();
-    return ResponseFactory.success(result, 'Location config items retrieved successfully');
+    return ResponseFactory.success(
+      result,
+      'Location config items retrieved successfully',
+    );
   }
 
   @Get('services')
@@ -81,7 +155,10 @@ export class ConfigController {
   })
   async getServices(): Promise<StdApiResponse<any>> {
     const result = await this.configService.getServices();
-    return ResponseFactory.success(result, 'Service config items retrieved successfully');
+    return ResponseFactory.success(
+      result,
+      'Service config items retrieved successfully',
+    );
   }
 
   @Get(':id')
@@ -92,13 +169,21 @@ export class ConfigController {
     description: 'Config item retrieved successfully',
     type: ConfigItemResponseDto,
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<ConfigItemResponseDto>> {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StdApiResponse<ConfigItemResponseDto>> {
     const result = await this.configService.findOne(id);
-    return ResponseFactory.success(result, 'Config item retrieved successfully');
+    return ResponseFactory.success(
+      result,
+      'Config item retrieved successfully',
+    );
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Update configuration item by ID' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('superadmin', 'admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update configuration item' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -108,9 +193,27 @@ export class ConfigController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateConfigItemDto: UpdateConfigItemDto,
-  ): Promise<StdApiResponse<ConfigItemResponseDto>> {
-    const result = await this.configService.update(id, updateConfigItemDto);
-    return ResponseFactory.success(result, 'Config item updated successfully');
+    @Req() req: any,
+  ): Promise<StdApiResponse<any>> {
+    const userInfo = {
+      id: req.user?.id,
+      email: req.user?.email,
+      name: req.user?.name,
+      role: req.user?.role,
+    };
+    const result = await this.configService.update(
+      id,
+      updateConfigItemDto,
+      userInfo,
+    );
+
+    return {
+      success: result.success,
+      message: result.message,
+      data: result.success ? result.data : null,
+      timestamp: new Date().toISOString(),
+      statusCode: HttpStatus.OK,
+    };
   }
 
   @Delete(':id')
@@ -120,7 +223,9 @@ export class ConfigController {
     status: HttpStatus.OK,
     description: 'Config item deleted successfully',
   })
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<any>> {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StdApiResponse<any>> {
     await this.configService.remove(id);
     return ResponseFactory.success(null, 'Config item deleted successfully');
   }
@@ -133,8 +238,13 @@ export class ConfigController {
     description: 'Config items retrieved successfully',
     type: [ConfigItemResponseDto],
   })
-  async findByGroup(@Param('group') group: string): Promise<StdApiResponse<any>> {
+  async findByGroup(
+    @Param('group') group: string,
+  ): Promise<StdApiResponse<any>> {
     const result = await this.configService.findByGroup(group);
-    return ResponseFactory.success(result, `Config items for group "${group}" retrieved successfully`);
+    return ResponseFactory.success(
+      result,
+      `Config items for group "${group}" retrieved successfully`,
+    );
   }
 }

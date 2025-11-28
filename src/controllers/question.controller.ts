@@ -18,8 +18,16 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { QuestionService } from '../services/question.service';
-import { CreateQuestionDto, UpdateQuestionDto, QuestionResponseDto, QuestionDetailResponseDto } from '../dto/question.dto';
-import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import {
+  CreateQuestionDto,
+  UpdateQuestionDto,
+  QuestionResponseDto,
+  QuestionDetailResponseDto,
+} from '../dto/question.dto';
+import {
+  ApiResponse as StdApiResponse,
+  ResponseFactory,
+} from '../interfaces/api-response.interface';
 
 @ApiTags('questions')
 @Controller('api/questions')
@@ -33,7 +41,9 @@ export class QuestionController {
     description: 'Question created successfully with images',
     type: QuestionDetailResponseDto,
   })
-  async create(@Body() createQuestionDto: CreateQuestionDto): Promise<QuestionDetailResponseDto> {
+  async create(
+    @Body() createQuestionDto: CreateQuestionDto,
+  ): Promise<QuestionDetailResponseDto> {
     return this.questionService.create(createQuestionDto);
   }
 
@@ -63,7 +73,9 @@ export class QuestionController {
     description: 'Question retrieved successfully with images',
     type: QuestionDetailResponseDto,
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<QuestionDetailResponseDto> {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<QuestionDetailResponseDto> {
     return this.questionService.findOne(id);
   }
 

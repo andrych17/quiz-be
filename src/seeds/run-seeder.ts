@@ -6,9 +6,9 @@ import { DatabaseSeeder } from './database.seeder';
 async function runSeeder() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const dataSource = app.get(DataSource);
-  
+
   const seeder = new DatabaseSeeder(dataSource);
-  
+
   try {
     await seeder.run();
     console.log('✅ Seeding completed successfully');

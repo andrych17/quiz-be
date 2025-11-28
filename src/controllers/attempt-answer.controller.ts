@@ -11,11 +11,21 @@ import {
   HttpCode,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { AttemptAnswerService } from '../services/attempt-answer.service';
-import { CreateAttemptAnswerDto, UpdateAttemptAnswerDto, AttemptAnswerResponseDto } from '../dto/attempt-answer.dto';
+import {
+  CreateAttemptAnswerDto,
+  UpdateAttemptAnswerDto,
+  AttemptAnswerResponseDto,
+} from '../dto/attempt-answer.dto';
 
 @ApiTags('Attempt Answers')
 @Controller('api/attempt-answers')
@@ -25,16 +35,19 @@ export class AttemptAnswerController {
   constructor(private readonly attemptAnswerService: AttemptAnswerService) {}
 
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create attempt answer',
-    description: 'Submit an answer for a specific question in an attempt.' 
+    description: 'Submit an answer for a specific question in an attempt.',
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Answer submitted successfully',
     type: AttemptAnswerResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Bad request - validation failed or answer already exists' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - validation failed or answer already exists',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Attempt or question not found' })
   async create(@Body() createAttemptAnswerDto: CreateAttemptAnswerDto) {
@@ -42,12 +55,12 @@ export class AttemptAnswerController {
   }
 
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get all attempt answers',
-    description: 'Retrieve all attempt answers. Requires admin role.' 
+    description: 'Retrieve all attempt answers. Requires admin role.',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'List of all attempt answers',
     type: [AttemptAnswerResponseDto],
   })
@@ -57,13 +70,13 @@ export class AttemptAnswerController {
   }
 
   @Get('attempt/:attemptId')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get answers for specific attempt',
-    description: 'Retrieve all answers submitted for a specific attempt.' 
+    description: 'Retrieve all answers submitted for a specific attempt.',
   })
   @ApiParam({ name: 'attemptId', type: 'number', description: 'Attempt ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'List of answers for the attempt',
     type: [AttemptAnswerResponseDto],
   })
@@ -74,30 +87,33 @@ export class AttemptAnswerController {
   }
 
   @Get('question/:questionId')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get answers for specific question',
-    description: 'Retrieve all answers submitted for a specific question across all attempts.' 
+    description:
+      'Retrieve all answers submitted for a specific question across all attempts.',
   })
   @ApiParam({ name: 'questionId', type: 'number', description: 'Question ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'List of answers for the question',
     type: [AttemptAnswerResponseDto],
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Question not found' })
-  async findByQuestionId(@Param('questionId', ParseIntPipe) questionId: number) {
+  async findByQuestionId(
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ) {
     return await this.attemptAnswerService.findByQuestionId(questionId);
   }
 
   @Get('question/:questionId/statistics')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get answer statistics for question',
-    description: 'Get statistical analysis of answers for a specific question.' 
+    description: 'Get statistical analysis of answers for a specific question.',
   })
   @ApiParam({ name: 'questionId', type: 'number', description: 'Question ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Answer statistics',
     schema: {
       type: 'object',
@@ -120,18 +136,20 @@ export class AttemptAnswerController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Question not found' })
-  async getAnswerStatistics(@Param('questionId', ParseIntPipe) questionId: number) {
+  async getAnswerStatistics(
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ) {
     return await this.attemptAnswerService.getAnswerStatistics(questionId);
   }
 
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get attempt answer by ID',
-    description: 'Retrieve a specific attempt answer by its ID.' 
+    description: 'Retrieve a specific attempt answer by its ID.',
   })
   @ApiParam({ name: 'id', type: 'number', description: 'Answer ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Answer details',
     type: AttemptAnswerResponseDto,
   })
@@ -142,13 +160,13 @@ export class AttemptAnswerController {
   }
 
   @Patch(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update attempt answer',
-    description: 'Update an existing attempt answer.' 
+    description: 'Update an existing attempt answer.',
   })
   @ApiParam({ name: 'id', type: 'number', description: 'Answer ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Answer updated successfully',
     type: AttemptAnswerResponseDto,
   })
@@ -164,9 +182,9 @@ export class AttemptAnswerController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Delete attempt answer',
-    description: 'Delete a specific attempt answer.' 
+    description: 'Delete a specific attempt answer.',
   })
   @ApiParam({ name: 'id', type: 'number', description: 'Answer ID' })
   @ApiResponse({ status: 204, description: 'Answer deleted successfully' })
@@ -177,13 +195,13 @@ export class AttemptAnswerController {
   }
 
   @Get('attempt/:attemptId/correct-count')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Count correct answers for attempt',
-    description: 'Get the number of correct answers for a specific attempt.' 
+    description: 'Get the number of correct answers for a specific attempt.',
   })
   @ApiParam({ name: 'attemptId', type: 'number', description: 'Attempt ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Correct answer count',
     schema: {
       type: 'object',
@@ -193,8 +211,11 @@ export class AttemptAnswerController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async countCorrectAnswers(@Param('attemptId', ParseIntPipe) attemptId: number) {
-    const count = await this.attemptAnswerService.countCorrectAnswers(attemptId);
+  async countCorrectAnswers(
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+  ) {
+    const count =
+      await this.attemptAnswerService.countCorrectAnswers(attemptId);
     return { correctAnswers: count };
   }
 }

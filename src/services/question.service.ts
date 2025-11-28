@@ -1,11 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Question } from '../entities/question.entity';
 import { Quiz } from '../entities/quiz.entity';
 import { QuizImage } from '../entities/quiz-image.entity';
-import { CreateQuestionDto, UpdateQuestionDto, QuestionResponseDto, QuestionDetailResponseDto } from '../dto/question.dto';
+import {
+  CreateQuestionDto,
+  UpdateQuestionDto,
+  QuestionResponseDto,
+  QuestionDetailResponseDto,
+} from '../dto/question.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
+import { FileUploadService } from './file-upload.service';
 
 @Injectable()
 export class QuestionService {
@@ -16,9 +26,12 @@ export class QuestionService {
     private quizRepository: Repository<Quiz>,
     @InjectRepository(QuizImage)
     private quizImageRepository: Repository<QuizImage>,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
-  async create(createQuestionDto: CreateQuestionDto): Promise<QuestionDetailResponseDto> {
+  async create(
+    createQuestionDto: CreateQuestionDto,
+  ): Promise<QuestionDetailResponseDto> {
     try {
       // Verify quiz exists
       const quiz = await this.quizRepository.findOne({
@@ -38,15 +51,50 @@ export class QuestionService {
         createQuestionDto.order = lastQuestion ? lastQuestion.order + 1 : 1;
       }
 
-      // Exclude images from question creation
-      const { images, ...questionData } = createQuestionDto;
+      // Exclude images and base64 from question creation
+      const {
+        images,
+        imageBase64,
+        imageOriginalName,
+        imageAltText,
+        ...questionData
+      } = createQuestionDto;
       const question = this.questionRepository.create(questionData);
       const savedQuestion = await this.questionRepository.save(question);
 
-      // Handle images
+      // Handle base64 image upload
       let savedImages = [];
-      if (images && images.length > 0) {
-        const questionImages = images.map(imageData => 
+      if (imageBase64) {
+        try {
+          const fileInfo = await this.fileUploadService.uploadFromBase64(
+            imageBase64,
+            imageOriginalName || 'question_image.jpg',
+            `question_${savedQuestion.id}`,
+          );
+
+          const imageRecord = this.quizImageRepository.create({
+            questionId: savedQuestion.id,
+            fileName: fileInfo.fileName,
+            originalName: fileInfo.originalName,
+            mimeType: fileInfo.mimeType,
+            fileSize: fileInfo.fileSize,
+            filePath: fileInfo.filePath,
+            altText: imageAltText,
+            isActive: true,
+          });
+
+          savedImages = [await this.quizImageRepository.save(imageRecord)];
+        } catch (uploadError) {
+          // If image upload fails, delete the question and throw error
+          await this.questionRepository.remove(savedQuestion);
+          throw new BadRequestException(
+            `Gagal upload gambar: ${uploadError.message}`,
+          );
+        }
+      }
+      // Handle pre-uploaded images (advanced usage)
+      else if (images && images.length > 0) {
+        const questionImages = images.map((imageData) =>
           this.quizImageRepository.create({
             questionId: savedQuestion.id,
             fileName: imageData.fileName,
@@ -56,7 +104,7 @@ export class QuestionService {
             filePath: imageData.filePath,
             altText: imageData.altText,
             isActive: true,
-          })
+          }),
         );
         savedImages = await this.quizImageRepository.save(questionImages);
       }
@@ -120,27 +168,77 @@ export class QuestionService {
     } as QuestionDetailResponseDto;
   }
 
-  async update(id: number, updateQuestionDto: UpdateQuestionDto): Promise<QuestionDetailResponseDto> {
+  async update(
+    id: number,
+    updateQuestionDto: UpdateQuestionDto,
+  ): Promise<QuestionDetailResponseDto> {
     const question = await this.questionRepository.findOne({ where: { id } });
 
     if (!question) {
       throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
     }
 
-    // Prepare update data excluding images
-    const { images, ...questionData } = updateQuestionDto;
+    // Prepare update data excluding images and base64
+    const {
+      images,
+      imageBase64,
+      imageOriginalName,
+      imageAltText,
+      ...questionData
+    } = updateQuestionDto;
 
     // Update question basic data
     await this.questionRepository.update(id, questionData);
 
-    // Handle images update
-    if (images !== undefined) {
+    // Handle base64 image upload
+    if (imageBase64) {
+      try {
+        // Delete existing images first
+        const existingImages = await this.quizImageRepository.find({
+          where: { questionId: id },
+        });
+
+        // Delete files from storage
+        for (const img of existingImages) {
+          await this.fileUploadService.deleteImage(img.filePath);
+        }
+
+        // Delete from database
+        await this.quizImageRepository.delete({ questionId: id });
+
+        // Upload new image
+        const fileInfo = await this.fileUploadService.uploadFromBase64(
+          imageBase64,
+          imageOriginalName || 'question_image.jpg',
+          `question_${id}`,
+        );
+
+        const imageRecord = this.quizImageRepository.create({
+          questionId: id,
+          fileName: fileInfo.fileName,
+          originalName: fileInfo.originalName,
+          mimeType: fileInfo.mimeType,
+          fileSize: fileInfo.fileSize,
+          filePath: fileInfo.filePath,
+          altText: imageAltText,
+          isActive: true,
+        });
+
+        await this.quizImageRepository.save(imageRecord);
+      } catch (uploadError) {
+        throw new BadRequestException(
+          `Gagal upload gambar: ${uploadError.message}`,
+        );
+      }
+    }
+    // Handle pre-uploaded images update (advanced usage)
+    else if (images !== undefined) {
       // Delete existing images
       await this.quizImageRepository.delete({ questionId: id });
-      
+
       // Create new images if provided
       if (images.length > 0) {
-        const newImages = images.map(imageData => 
+        const newImages = images.map((imageData) =>
           this.quizImageRepository.create({
             questionId: id,
             fileName: imageData.fileName,
@@ -150,7 +248,7 @@ export class QuestionService {
             filePath: imageData.filePath,
             altText: imageData.altText,
             isActive: true,
-          })
+          }),
         );
         await this.quizImageRepository.save(newImages);
       }
@@ -181,7 +279,7 @@ export class QuestionService {
     for (let i = 0; i < questionIds.length; i++) {
       await this.questionRepository.update(
         { id: questionIds[i], quizId },
-        { order: i + 1 }
+        { order: i + 1 },
       );
     }
 

@@ -1,8 +1,18 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from './user.service';
-import { LoginDto, RegisterDto, AuthResponseDto, ChangePasswordDto, UpdateProfileDto } from '../dto/auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  AuthResponseDto,
+  ChangePasswordDto,
+  UpdateProfileDto,
+} from '../dto/auth.dto';
 import { CreateUserDto, UserRole } from '../dto/user.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import * as bcrypt from 'bcrypt';
@@ -17,13 +27,16 @@ export class AuthService {
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.userService.findByEmail(email);
-    
+
     if (!user) {
       return null;
     }
 
-    const isPasswordValid = await this.userService.validatePassword(user, password);
-    
+    const isPasswordValid = await this.userService.validatePassword(
+      user,
+      password,
+    );
+
     if (!isPasswordValid) {
       return null;
     }
@@ -35,7 +48,7 @@ export class AuthService {
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
-    
+
     if (!user) {
       throw new UnauthorizedException(ERROR_MESSAGES.INVALID_CREDENTIALS);
     }
@@ -43,10 +56,10 @@ export class AuthService {
     // Update last login
     await this.updateLastLogin(user.id);
 
-    const payload = { 
-      sub: user.id, 
-      email: user.email, 
-      role: user.role 
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -68,7 +81,7 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     // Check if user already exists
     const existingUser = await this.userService.findByEmail(registerDto.email);
-    
+
     if (existingUser) {
       throw new BadRequestException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
     }
@@ -84,10 +97,10 @@ export class AuthService {
     const newUser = await this.userService.create(createUserDto);
 
     // Generate JWT token
-    const payload = { 
-      sub: newUser.id, 
-      email: newUser.email, 
-      role: newUser.role 
+    const payload = {
+      sub: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -115,14 +128,15 @@ export class AuthService {
         throw new UnauthorizedException(ERROR_MESSAGES.INVALID_CREDENTIALS);
       }
 
-      const newPayload = { 
-        sub: user.id, 
-        email: user.email, 
-        role: user.role 
+      const newPayload = {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
       };
 
       const accessToken = this.jwtService.sign(newPayload);
-      const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
+      const expiresIn =
+        this.configService.get<string>('JWT_EXPIRES_IN') || '7d';
 
       return {
         access_token: accessToken,
@@ -140,19 +154,22 @@ export class AuthService {
     }
   }
 
-  async changePassword(userId: number, changePasswordDto: ChangePasswordDto): Promise<any> {
+  async changePassword(
+    userId: number,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<any> {
     const user = await this.userService.findByEmail(
-      (await this.userService.findOne(userId)).email
+      (await this.userService.findOne(userId)).email,
     );
-    
+
     if (!user) {
       throw new UnauthorizedException(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
     // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(
-      changePasswordDto.currentPassword, 
-      user.password
+      changePasswordDto.currentPassword,
+      user.password,
     );
 
     if (!isCurrentPasswordValid) {
@@ -171,7 +188,7 @@ export class AuthService {
 
   async getProfile(userId: number): Promise<any> {
     const user = await this.userService.findOne(userId);
-    
+
     if (!user) {
       throw new UnauthorizedException(ERROR_MESSAGES.USER_NOT_FOUND);
     }
@@ -179,11 +196,14 @@ export class AuthService {
     return user;
   }
 
-  async updateProfile(userId: number, updateProfileDto: UpdateProfileDto): Promise<any> {
+  async updateProfile(
+    userId: number,
+    updateProfileDto: UpdateProfileDto,
+  ): Promise<any> {
     const user = await this.userService.findByEmail(
-      (await this.userService.findOne(userId)).email
+      (await this.userService.findOne(userId)).email,
     );
-    
+
     if (!user) {
       throw new UnauthorizedException(ERROR_MESSAGES.USER_NOT_FOUND);
     }
@@ -199,12 +219,14 @@ export class AuthService {
     if (updateProfileDto.email) {
       // Verify current password if changing email
       if (!updateProfileDto.currentPassword) {
-        throw new BadRequestException('Current password is required when updating email');
+        throw new BadRequestException(
+          'Current password is required when updating email',
+        );
       }
 
       const isPasswordValid = await bcrypt.compare(
-        updateProfileDto.currentPassword, 
-        user.password
+        updateProfileDto.currentPassword,
+        user.password,
       );
 
       if (!isPasswordValid) {
@@ -212,7 +234,9 @@ export class AuthService {
       }
 
       // Check if new email already exists
-      const existingUser = await this.userService.findByEmail(updateProfileDto.email);
+      const existingUser = await this.userService.findByEmail(
+        updateProfileDto.email,
+      );
       if (existingUser && existingUser.id !== userId) {
         throw new BadRequestException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
       }
@@ -224,12 +248,14 @@ export class AuthService {
     if (updateProfileDto.newPassword) {
       // Verify current password
       if (!updateProfileDto.currentPassword) {
-        throw new BadRequestException('Current password is required when updating password');
+        throw new BadRequestException(
+          'Current password is required when updating password',
+        );
       }
 
       const isPasswordValid = await bcrypt.compare(
-        updateProfileDto.currentPassword, 
-        user.password
+        updateProfileDto.currentPassword,
+        user.password,
       );
 
       if (!isPasswordValid) {

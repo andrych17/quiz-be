@@ -18,7 +18,11 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AttemptService } from '../services/attempt.service';
-import { CreateAttemptDto, UpdateAttemptDto, AttemptResponseDto } from '../dto/attempt.dto';
+import {
+  CreateAttemptDto,
+  UpdateAttemptDto,
+  AttemptResponseDto,
+} from '../dto/attempt.dto';
 
 @ApiTags('attempts')
 @Controller('api/attempts')
@@ -32,18 +36,22 @@ export class AttemptController {
     description: 'Attempt created successfully',
     type: AttemptResponseDto,
   })
-  async create(@Body() createAttemptDto: CreateAttemptDto): Promise<AttemptResponseDto> {
+  async create(
+    @Body() createAttemptDto: CreateAttemptDto,
+  ): Promise<AttemptResponseDto> {
     return this.attemptService.create(createAttemptDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all attempts with pagination' })
+  @ApiOperation({ summary: 'Get all attempts with pagination and filters' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'email', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'serviceKey', required: false, type: String })
+  @ApiQuery({ name: 'locationKey', required: false, type: String })
   @ApiQuery({ name: 'quizId', required: false, type: Number })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (participantName, email, score, submittedAt)' })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
+  @ApiQuery({ name: 'startDate', required: false, type: String })
+  @ApiQuery({ name: 'endDate', required: false, type: String })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Attempts retrieved successfully',
@@ -52,12 +60,23 @@ export class AttemptController {
   async findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
-    @Query('email') email?: string,
+    @Query('search') search?: string,
+    @Query('serviceKey') serviceKey?: string,
+    @Query('locationKey') locationKey?: string,
     @Query('quizId') quizId?: number,
-    @Query('sortBy') sortBy: string = 'submittedAt',
-    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.attemptService.findAll(page, limit, email, quizId, sortBy, sortOrder);
+    return this.attemptService.findAllWithFilter(
+      page,
+      limit,
+      search,
+      serviceKey,
+      locationKey,
+      quizId,
+      startDate,
+      endDate,
+    );
   }
 
   @Get(':id')
@@ -68,8 +87,23 @@ export class AttemptController {
     description: 'Attempt retrieved successfully',
     type: AttemptResponseDto,
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<AttemptResponseDto> {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<AttemptResponseDto> {
     return this.attemptService.findOne(id);
+  }
+
+  @Get(':id/view')
+  @ApiOperation({ summary: 'Get attempt with detailed answers for review' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attempt with answers retrieved successfully',
+  })
+  async viewAttempt(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.attemptService.getAttemptWithAnswers(id);
   }
 
   @Put(':id')

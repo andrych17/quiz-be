@@ -8,7 +8,9 @@ export class UrlShortenerService {
 
   constructor() {
     // Initialize TinyURL API token
-    this.tinyUrlApiToken = process.env.TINYURL_API_TOKEN || 'f5AaG8A2durI2CEOTP8qasCNVIuVvOMoQtp9RT19sLXXYXARE0C1l3VPWOpI';
+    this.tinyUrlApiToken =
+      process.env.TINYURL_API_TOKEN ||
+      'f5AaG8A2durI2CEOTP8qasCNVIuVvOMoQtp9RT19sLXXYXARE0C1l3VPWOpI';
   }
 
   async shortenUrl(longUrl: string, alias?: string): Promise<string> {
@@ -20,7 +22,7 @@ export class UrlShortenerService {
 
       const payload: any = {
         url: longUrl,
-        domain: 'tinyurl.com'
+        domain: 'tinyurl.com',
       };
 
       // Add alias if provided
@@ -33,10 +35,10 @@ export class UrlShortenerService {
         payload,
         {
           headers: {
-            'Authorization': `Bearer ${this.tinyUrlApiToken}`,
+            Authorization: `Bearer ${this.tinyUrlApiToken}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (response.data && response.data.data && response.data.data.tiny_url) {
@@ -46,7 +48,10 @@ export class UrlShortenerService {
       // Fallback to original URL if API response is unexpected
       return longUrl;
     } catch (error) {
-      console.error('Error shortening URL with TinyURL:', error.response?.data || error.message);
+      console.error(
+        'Error shortening URL with TinyURL:',
+        error.response?.data || error.message,
+      );
       // Fallback to original URL if shortening fails
       return longUrl;
     }
@@ -63,7 +68,10 @@ export class UrlShortenerService {
   /**
    * Generate and shorten a quiz link with optional alias
    */
-  async generateAndShortenQuizUrl(token: string, alias?: string): Promise<string> {
+  async generateAndShortenQuizUrl(
+    token: string,
+    alias?: string,
+  ): Promise<string> {
     const longUrl = this.generateQuizUrl(token);
     return await this.shortenUrl(longUrl, alias);
   }

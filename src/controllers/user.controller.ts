@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   HttpStatus,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,10 +21,18 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UserService } from '../services/user.service';
-import { CreateUserDto, UpdateUserDto, UserResponseDto, UserDetailResponseDto } from '../dto/user.dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  UserResponseDto,
+  UserDetailResponseDto,
+} from '../dto/user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
-import { ApiResponse as StdApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import {
+  ApiResponse as StdApiResponse,
+  ResponseFactory,
+} from '../interfaces/api-response.interface';
 
 @ApiTags('users')
 @Controller('api/users')
@@ -41,9 +50,25 @@ export class UserController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input data',
   })
-  async create(@Body() createUserDto: CreateUserDto): Promise<StdApiResponse<UserDetailResponseDto>> {
-    const result = await this.userService.create(createUserDto);
-    return ResponseFactory.success(result, 'User created successfully', undefined, HttpStatus.CREATED);
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @Req() req: any,
+  ): Promise<StdApiResponse<any>> {
+    const userInfo = {
+      id: req.user?.id,
+      email: req.user?.email,
+      name: req.user?.name,
+      role: req.user?.role,
+    };
+    const result = await this.userService.create(createUserDto, userInfo);
+
+    return {
+      success: result.success,
+      message: result.message,
+      data: result.success ? result.data : null,
+      timestamp: new Date().toISOString(),
+      statusCode: HttpStatus.OK,
+    };
   }
 
   @Get()
@@ -51,14 +76,54 @@ export class UserController {
   @Roles('admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users with pagination' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or email' })
-  @ApiQuery({ name: 'serviceId', required: false, type: Number, description: 'Filter by service ID' })
-  @ApiQuery({ name: 'locationId', required: false, type: Number, description: 'Filter by location ID' })
-  @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by user role' })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (name, email, role, createdAt, updatedAt)' })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by name or email',
+  })
+  @ApiQuery({
+    name: 'serviceKey',
+    required: false,
+    type: String,
+    description: 'Filter by service key (e.g., sm, am, network_operation)',
+  })
+  @ApiQuery({
+    name: 'locationKey',
+    required: false,
+    type: String,
+    description: 'Filter by location key (e.g., jakarta_pusat, jakarta_utara)',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    type: String,
+    description: 'Filter by user role',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Sort by field (name, email, role, createdAt, updatedAt)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['ASC', 'DESC'],
+    description: 'Sort order',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Users retrieved successfully',
@@ -74,13 +139,24 @@ export class UserController {
     @Query('sortBy') sortBy: string = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
-    return this.userService.findAll(page, limit, search, serviceKey, locationKey, role, sortBy, sortOrder);
+    return this.userService.findAllWithDisplayNames(
+      page,
+      limit,
+      search,
+      serviceKey,
+      locationKey,
+      role,
+      sortBy,
+      sortOrder,
+    );
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user by ID with complete details (assigned quizzes)' })
+  @ApiOperation({
+    summary: 'Get user by ID with complete details (assigned quizzes)',
+  })
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -91,9 +167,14 @@ export class UserController {
     status: HttpStatus.NOT_FOUND,
     description: 'User not found',
   })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<UserDetailResponseDto>> {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StdApiResponse<UserDetailResponseDto>> {
     const result = await this.userService.findOne(id);
-    return ResponseFactory.success(result, 'User retrieved successfully with complete details');
+    return ResponseFactory.success(
+      result,
+      'User retrieved successfully with complete details',
+    );
   }
 
   @Put(':id')
@@ -111,8 +192,15 @@ export class UserController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
+    @Req() req: any,
   ): Promise<StdApiResponse<UserDetailResponseDto>> {
-    const result = await this.userService.update(id, updateUserDto);
+    const userInfo = {
+      id: req.user?.id,
+      email: req.user?.email,
+      name: req.user?.name,
+      role: req.user?.role,
+    };
+    const result = await this.userService.update(id, updateUserDto, userInfo);
     return ResponseFactory.success(result, 'User updated successfully');
   }
 
@@ -127,7 +215,9 @@ export class UserController {
     status: HttpStatus.NOT_FOUND,
     description: 'User not found',
   })
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<StdApiResponse<any>> {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StdApiResponse<any>> {
     await this.userService.remove(id);
     return ResponseFactory.success(null, 'User deleted successfully');
   }

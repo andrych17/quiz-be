@@ -1,13 +1,31 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
 import { ConfigItem } from '../entities/config-item.entity';
-import { CreateUserDto, UpdateUserDto, UserResponseDto, UserDetailResponseDto, UserRole } from '../dto/user.dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  UserResponseDto,
+  UserDetailResponseDto,
+  UserRole,
+} from '../dto/user.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, DEFAULTS } from '../constants';
 import { AutoAssignmentService } from './auto-assignment.service';
+import { ConfigService } from './config.service';
+
+interface UserInfo {
+  id?: number;
+  email?: string;
+  name?: string;
+  role?: string;
+}
 
 @Injectable()
 export class UserService {
@@ -19,9 +37,13 @@ export class UserService {
     @InjectRepository(ConfigItem)
     private configItemRepository: Repository<ConfigItem>,
     private autoAssignmentService: AutoAssignmentService,
+    private configService: ConfigService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<UserDetailResponseDto> {
+  async create(
+    createUserDto: CreateUserDto,
+    userInfo?: UserInfo,
+  ): Promise<any> {
     try {
       // Check if email already exists
       const existingUser = await this.userRepository.findOne({
@@ -29,32 +51,49 @@ export class UserService {
       });
 
       if (existingUser) {
-        throw new BadRequestException(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
+        return {
+          success: false,
+          message: ERROR_MESSAGES.EMAIL_ALREADY_EXISTS,
+          error: 'EMAIL_ALREADY_EXISTS',
+          data: {
+            email: createUserDto.email,
+            existingUserId: existingUser.id,
+          },
+        };
       }
 
       // Hash password
       const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
-      // Create user
+      // Create user - exclude service/location objects, use only keys
+      const { service, location, ...userCreateData } = createUserDto;
       const user = this.userRepository.create({
-        ...createUserDto,
+        ...userCreateData,
         password: hashedPassword,
-        role: (createUserDto.role || DEFAULTS.USER_ROLE as UserRole) as 'admin' | 'user',
+        role: (createUserDto.role || (DEFAULTS.USER_ROLE as UserRole)) as
+          | 'admin'
+          | 'user',
         locationKey: createUserDto.locationKey,
         serviceKey: createUserDto.serviceKey,
+        isActive: createUserDto.isActive ?? true, // Default to true if not provided
+        createdBy: userInfo?.email || userInfo?.name || 'system',
+        updatedBy: userInfo?.email || userInfo?.name || 'system',
       });
 
       const savedUser = await this.userRepository.save(user);
 
       // Auto-assign to quizzes based on service and location (for admin users)
-      if ((createUserDto.serviceKey || createUserDto.locationKey) && savedUser.role === 'admin') {
+      if (
+        (createUserDto.serviceKey || createUserDto.locationKey) &&
+        savedUser.role === 'admin'
+      ) {
         // Auto-assign user to all existing quizzes matching their service and location
         await this.autoAssignmentService.updateUserServiceLocationAssignments(
           savedUser.id,
           createUserDto.serviceKey,
           createUserDto.locationKey,
           null, // No old service since this is new user
-          null  // No old location since this is new user
+          null, // No old location since this is new user
         );
       }
 
@@ -67,7 +106,7 @@ export class UserService {
           order: { createdAt: 'DESC' },
         });
 
-        assignedQuizzes = quizAssignments.map(assignment => ({
+        assignedQuizzes = quizAssignments.map((assignment) => ({
           id: assignment.quiz.id,
           title: assignment.quiz.title,
           description: assignment.quiz.description,
@@ -77,22 +116,33 @@ export class UserService {
           startDateTime: assignment.quiz.startDateTime,
           endDateTime: assignment.quiz.endDateTime,
           createdAt: assignment.quiz.createdAt,
-          assignmentType: assignment.assignedBy === 'system' ? 'auto' : 'manual',
+          assignmentType:
+            assignment.assignedBy === 'system' ? 'auto' : 'manual',
         }));
       }
 
       // Return user without password
       const { password, ...result } = savedUser;
       return {
-        ...result,
-        role: result.role as UserRole,
-        assignedQuizzes,
+        success: true,
+        message: 'User created successfully',
+        data: {
+          ...result,
+          role: result.role as UserRole,
+          assignedQuizzes,
+        },
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(ERROR_MESSAGES.USER_CREATION_FAILED);
+      console.error('User creation error:', error);
+      return {
+        success: false,
+        message: ERROR_MESSAGES.USER_CREATION_FAILED,
+        error: 'USER_CREATION_FAILED',
+        data: {
+          email: createUserDto.email,
+          originalError: error.message,
+        },
+      };
     }
   }
 
@@ -104,51 +154,80 @@ export class UserService {
     locationKey?: string,
     role?: string,
     sortBy: string = 'createdAt',
-    sortOrder: 'ASC' | 'DESC' = 'DESC'
-  ): Promise<{ items: UserResponseDto[], pagination: { currentPage: number, totalPages: number, pageSize: number, totalItems: number, hasNext: boolean, hasPrevious: boolean } }> {
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ): Promise<{
+    items: UserResponseDto[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      pageSize: number;
+      totalItems: number;
+      hasNext: boolean;
+      hasPrevious: boolean;
+    };
+  }> {
     const skip = (page - 1) * limit;
-    
+
     // Use query builder for filtering (no joins needed with key-based storage)
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
       .select([
         'user.id',
-        'user.name', 
+        'user.name',
         'user.email',
         'user.role',
         'user.serviceKey',
         'user.locationKey',
+        'user.isActive',
         'user.createdAt',
-        'user.updatedAt'
-      ]);
+        'user.updatedAt',
+      ])
+      .where('user.isActive = :isActive', { isActive: true });
 
-    // Add service filter
-    if (serviceKey) {
+    // Add service filter (ignore "all_services" and similar values)
+    if (
+      serviceKey &&
+      serviceKey !== 'all_services' &&
+      !serviceKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('user.serviceKey = :serviceKey', { serviceKey });
     }
-    
-    // Add location filter
-    if (locationKey) {
+
+    // Add location filter (ignore "all_locations" and similar values)
+    if (
+      locationKey &&
+      locationKey !== 'all_locations' &&
+      !locationKey.startsWith('all_')
+    ) {
       queryBuilder.andWhere('user.locationKey = :locationKey', { locationKey });
     }
-    
-    // Add role filter
+
+    // Add role filter - use exact match for enum field
     if (role) {
-      queryBuilder.andWhere('UPPER(user.role) LIKE UPPER(:role)', { role: `%${role}%` });
+      queryBuilder.andWhere('user.role = :role', { role });
     }
 
     // Add search conditions with LIKE UPPER
     if (search) {
       queryBuilder.andWhere(
         '(UPPER(user.name) LIKE UPPER(:search) OR UPPER(user.email) LIKE UPPER(:search))',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
     // Validate sortBy field to prevent SQL injection
-    const allowedSortFields = ['name', 'email', 'role', 'createdAt', 'updatedAt'];
-    const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
-    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
+    const allowedSortFields = [
+      'name',
+      'email',
+      'role',
+      'createdAt',
+      'updatedAt',
+    ];
+    const validSortBy = allowedSortFields.includes(sortBy)
+      ? sortBy
+      : 'createdAt';
+    const validSortOrder =
+      sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'DESC';
 
     const [users, total] = await queryBuilder
       .orderBy(`user.${validSortBy}`, validSortOrder)
@@ -157,7 +236,7 @@ export class UserService {
       .getManyAndCount();
 
     const totalPages = Math.ceil(total / limit);
-    
+
     const pagination = {
       currentPage: page,
       totalPages,
@@ -169,30 +248,38 @@ export class UserService {
 
     // Get config items for display
     const serviceConfigs = await this.configItemRepository.find({
-      where: { group: 'service' }
+      where: { group: 'service' },
     });
     const locationConfigs = await this.configItemRepository.find({
-      where: { group: 'location' }
+      where: { group: 'location' },
     });
 
     return {
-      items: users.map(user => {
-        const serviceConfig = user.serviceKey ? serviceConfigs.find(s => s.key === user.serviceKey) : null;
-        const locationConfig = user.locationKey ? locationConfigs.find(l => l.key === user.locationKey) : null;
-        
+      items: users.map((user) => {
+        const serviceConfig = user.serviceKey
+          ? serviceConfigs.find((s) => s.key === user.serviceKey)
+          : null;
+        const locationConfig = user.locationKey
+          ? locationConfigs.find((l) => l.key === user.locationKey)
+          : null;
+
         return {
           ...user,
           role: user.role as UserRole,
-          service: serviceConfig ? {
-            id: serviceConfig.id,
-            key: serviceConfig.key,
-            value: serviceConfig.value
-          } : null,
-          location: locationConfig ? {
-            id: locationConfig.id,
-            key: locationConfig.key,
-            value: locationConfig.value
-          } : null,
+          service: serviceConfig
+            ? {
+                id: serviceConfig.id,
+                key: serviceConfig.key,
+                value: serviceConfig.value,
+              }
+            : null,
+          location: locationConfig
+            ? {
+                id: locationConfig.id,
+                key: locationConfig.key,
+                value: locationConfig.value,
+              }
+            : null,
         };
       }),
       pagination,
@@ -202,7 +289,17 @@ export class UserService {
   async findOne(id: number): Promise<UserDetailResponseDto> {
     const user = await this.userRepository.findOne({
       where: { id },
-      select: ['id', 'name', 'email', 'role', 'serviceKey', 'locationKey', 'createdAt', 'updatedAt'],
+      select: [
+        'id',
+        'name',
+        'email',
+        'role',
+        'serviceKey',
+        'locationKey',
+        'isActive',
+        'createdAt',
+        'updatedAt',
+      ],
     });
 
     if (!user) {
@@ -215,13 +312,13 @@ export class UserService {
 
     if (user.serviceKey) {
       serviceConfig = await this.configItemRepository.findOne({
-        where: { group: 'service', key: user.serviceKey }
+        where: { group: 'service', key: user.serviceKey },
       });
     }
 
     if (user.locationKey) {
       locationConfig = await this.configItemRepository.findOne({
-        where: { group: 'location', key: user.locationKey }
+        where: { group: 'location', key: user.locationKey },
       });
     }
 
@@ -235,7 +332,7 @@ export class UserService {
         order: { createdAt: 'DESC' },
       });
 
-      assignedQuizzes = assignments.map(assignment => ({
+      assignedQuizzes = assignments.map((assignment) => ({
         id: assignment.quiz.id,
         title: assignment.quiz.title,
         description: assignment.quiz.description,
@@ -251,21 +348,29 @@ export class UserService {
     return {
       ...user,
       role: user.role as UserRole,
-      service: serviceConfig ? {
-        id: serviceConfig.id,
-        key: serviceConfig.key,
-        value: serviceConfig.value
-      } : null,
-      location: locationConfig ? {
-        id: locationConfig.id,
-        key: locationConfig.key,
-        value: locationConfig.value
-      } : null,
+      service: serviceConfig
+        ? {
+            id: serviceConfig.id,
+            key: serviceConfig.key,
+            value: serviceConfig.value,
+          }
+        : null,
+      location: locationConfig
+        ? {
+            id: locationConfig.id,
+            key: locationConfig.key,
+            value: locationConfig.value,
+          }
+        : null,
       assignedQuizzes,
     };
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<UserDetailResponseDto> {
+  async update(
+    id: number,
+    updateUserDto: UpdateUserDto,
+    userInfo?: UserInfo,
+  ): Promise<UserDetailResponseDto> {
     const user = await this.userRepository.findOne({ where: { id } });
 
     if (!user) {
@@ -301,20 +406,23 @@ export class UserService {
     const updateData: Partial<User> = {
       ...userData,
       role: userData.role as 'admin' | 'user' | undefined,
+      updatedBy: userInfo?.email || userInfo?.name || 'system',
     };
-    
+
     await this.userRepository.update(id, updateData);
 
     // Handle auto-assignment based on service/location change (for admin users only)
     const updatedUser = await this.userRepository.findOne({ where: { id } });
-    if (updatedUser?.role === 'admin' && 
-        (oldServiceKey !== newServiceKey || oldLocationKey !== newLocationKey)) {
+    if (
+      updatedUser?.role === 'admin' &&
+      (oldServiceKey !== newServiceKey || oldLocationKey !== newLocationKey)
+    ) {
       await this.autoAssignmentService.updateUserServiceLocationAssignments(
         id,
         newServiceKey,
         newLocationKey,
         oldServiceKey,
-        oldLocationKey
+        oldLocationKey,
       );
     }
 
@@ -357,13 +465,65 @@ export class UserService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ 
+    return this.userRepository.findOne({
       where: { email },
-      select: ['id', 'name', 'email', 'password', 'role', 'createdAt', 'updatedAt', 'lastLogin', 'isActive']
+      select: [
+        'id',
+        'name',
+        'email',
+        'password',
+        'role',
+        'createdAt',
+        'updatedAt',
+        'lastLogin',
+        'isActive',
+      ],
     });
   }
 
   async validatePassword(user: User, password: string): Promise<boolean> {
     return bcrypt.compare(password, user.password);
+  }
+
+  async findAllWithDisplayNames(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    serviceKey?: string,
+    locationKey?: string,
+    role?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ) {
+    // Get user data using existing method
+    const userData = await this.findAll(
+      page,
+      limit,
+      search,
+      serviceKey,
+      locationKey,
+      role,
+      sortBy,
+      sortOrder,
+    );
+
+    // Get config mappings
+    const mappings = await this.configService.getMappings();
+
+    // Enhance user data with display names
+    const enhancedUsers = userData.items.map((user) => ({
+      ...user,
+      serviceName: user.serviceKey
+        ? mappings.services.mapping[user.serviceKey] || user.serviceKey
+        : null,
+      locationName: user.locationKey
+        ? mappings.locations.mapping[user.locationKey] || user.locationKey
+        : null,
+    }));
+
+    return {
+      items: enhancedUsers,
+      pagination: userData.pagination,
+    };
   }
 }

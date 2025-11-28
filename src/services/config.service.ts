@@ -1,10 +1,28 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { ConfigItem } from '../entities/config-item.entity';
-import { CreateConfigItemDto, UpdateConfigItemDto, ConfigItemResponseDto } from '../dto/config.dto';
+import {
+  CreateConfigItemDto,
+  UpdateConfigItemDto,
+  ConfigItemResponseDto,
+} from '../dto/config.dto';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
-import { ApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import {
+  ApiResponse,
+  ResponseFactory,
+} from '../interfaces/api-response.interface';
+
+interface UserInfo {
+  id?: number;
+  email?: string;
+  name?: string;
+  role?: string;
+}
 
 @Injectable()
 export class ConfigService {
@@ -13,53 +31,117 @@ export class ConfigService {
     private configItemRepository: Repository<ConfigItem>,
   ) {}
 
-  async create(createConfigItemDto: CreateConfigItemDto): Promise<ConfigItemResponseDto> {
+  async create(
+    createConfigItemDto: CreateConfigItemDto,
+    userInfo?: UserInfo,
+  ): Promise<any> {
     try {
       // Check for duplicate key within the same group
-      const existingItem = await this.configItemRepository.findOne({
+      const existingKeyItem = await this.configItemRepository.findOne({
         where: {
           group: createConfigItemDto.group,
           key: createConfigItemDto.key,
         },
       });
 
-      if (existingItem) {
-        throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_ENTRY);
+      if (existingKeyItem) {
+        return {
+          success: false,
+          message: `${ERROR_MESSAGES.DUPLICATE_ENTRY}: Key already exists in this group`,
+          error: 'DUPLICATE_KEY',
+          data: {
+            group: createConfigItemDto.group,
+            key: createConfigItemDto.key,
+            existingId: existingKeyItem.id,
+            existingValue: existingKeyItem.value,
+          },
+        };
       }
 
-      const configItem = this.configItemRepository.create(createConfigItemDto);
-      return await this.configItemRepository.save(configItem);
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
+      // Check for duplicate value within the same group
+      const existingValueItem = await this.configItemRepository.findOne({
+        where: {
+          group: createConfigItemDto.group,
+          value: createConfigItemDto.value,
+        },
+      });
+
+      if (existingValueItem) {
+        return {
+          success: false,
+          message: `${ERROR_MESSAGES.DUPLICATE_ENTRY}: Value already exists in this group`,
+          error: 'DUPLICATE_VALUE',
+          data: {
+            group: createConfigItemDto.group,
+            value: createConfigItemDto.value,
+            existingId: existingValueItem.id,
+            existingKey: existingValueItem.key,
+          },
+        };
       }
-      throw new BadRequestException(ERROR_MESSAGES.DATABASE_ERROR);
+
+      const configItem = this.configItemRepository.create({
+        ...createConfigItemDto,
+        isActive: createConfigItemDto.isActive ?? true, // Default to true if not provided
+        order: createConfigItemDto.order ?? 0, // Default to 0 if not provided
+        createdBy: userInfo?.email || userInfo?.name || 'system',
+        updatedBy: userInfo?.email || userInfo?.name || 'system',
+      });
+
+      const savedItem = await this.configItemRepository.save(configItem);
+      return {
+        success: true,
+        message: 'Config item created successfully',
+        data: savedItem,
+      };
+    } catch (error) {
+      console.error('Config creation error:', error);
+      return {
+        success: false,
+        message: ERROR_MESSAGES.DATABASE_ERROR,
+        error: 'DATABASE_ERROR',
+        data: {
+          group: createConfigItemDto.group,
+          key: createConfigItemDto.key,
+          originalError: error.message,
+        },
+      };
     }
   }
 
   async findAll(
-    page: number = 1, 
-    limit: number = 10, 
+    page: number = 1,
+    limit: number = 10,
     group?: string,
     sortBy: string = 'group',
-    sortOrder: 'ASC' | 'DESC' = 'ASC'
+    sortOrder: 'ASC' | 'DESC' = 'ASC',
   ) {
     const skip = (page - 1) * limit;
-    const whereCondition: any = {};
+    const whereCondition: any = {
+      isActive: true, // Only show active config items
+    };
 
     if (group) {
       whereCondition.group = group;
     }
 
     // Validate sortBy field to prevent SQL injection
-    const allowedSortFields = ['group', 'key', 'value', 'order', 'createdAt', 'updatedAt'];
+    const allowedSortFields = [
+      'group',
+      'key',
+      'value',
+      'order',
+      'createdAt',
+      'updatedAt',
+    ];
     const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'group';
-    const validSortOrder = sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'ASC';
+    const validSortOrder =
+      sortOrder === 'ASC' || sortOrder === 'DESC' ? sortOrder : 'ASC';
 
     // Build order object
     const orderOptions: any = {};
     orderOptions[validSortBy] = validSortOrder;
-    
+
     // Add secondary sort by key for consistent ordering
     if (validSortBy !== 'key') {
       orderOptions.key = 'ASC';
@@ -73,7 +155,7 @@ export class ConfigService {
     });
 
     const totalPages = Math.ceil(total / limit);
-    
+
     return {
       items: configItems,
       pagination: {
@@ -83,7 +165,7 @@ export class ConfigService {
         totalItems: total,
         hasNext: page < totalPages,
         hasPrevious: page > 1,
-      }
+      },
     };
   }
 
@@ -93,46 +175,149 @@ export class ConfigService {
     });
 
     if (!configItem) {
-      throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
+      throw new NotFoundException({
+        message: ERROR_MESSAGES.RECORD_NOT_FOUND,
+        error: 'CONFIG_ITEM_NOT_FOUND',
+        data: { id },
+      });
     }
 
     return configItem;
   }
 
-  async update(id: number, updateConfigItemDto: UpdateConfigItemDto): Promise<ConfigItemResponseDto> {
-    const configItem = await this.configItemRepository.findOne({ where: { id } });
-
-    if (!configItem) {
-      throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
-    }
-
-    // Check for duplicate key within the same group if key or group is being updated
-    if (updateConfigItemDto.key || updateConfigItemDto.group) {
-      const group = updateConfigItemDto.group || configItem.group;
-      const key = updateConfigItemDto.key || configItem.key;
-
-      const existingItem = await this.configItemRepository.findOne({
-        where: { group, key },
+  async update(
+    id: number,
+    updateConfigItemDto: UpdateConfigItemDto,
+    userInfo?: UserInfo,
+  ): Promise<any> {
+    try {
+      const configItem = await this.configItemRepository.findOne({
+        where: { id },
       });
 
-      if (existingItem && existingItem.id !== id) {
-        throw new BadRequestException(ERROR_MESSAGES.DUPLICATE_ENTRY);
+      if (!configItem) {
+        return {
+          success: false,
+          message: ERROR_MESSAGES.RECORD_NOT_FOUND,
+          error: 'CONFIG_ITEM_NOT_FOUND',
+          data: { id },
+        };
       }
-    }
 
-    await this.configItemRepository.update(id, updateConfigItemDto);
-    return this.findOne(id);
+      // Check for duplicate key within the same group if key or group is being updated
+      if (updateConfigItemDto.key || updateConfigItemDto.group) {
+        const group = updateConfigItemDto.group || configItem.group;
+        const key = updateConfigItemDto.key || configItem.key;
+
+        const existingKeyItem = await this.configItemRepository.findOne({
+          where: { group, key },
+        });
+
+        if (existingKeyItem && existingKeyItem.id !== id) {
+          return {
+            success: false,
+            message: `${ERROR_MESSAGES.DUPLICATE_ENTRY}: Key already exists in this group`,
+            error: 'DUPLICATE_KEY',
+            data: {
+              id,
+              group,
+              key,
+              existingId: existingKeyItem.id,
+              existingValue: existingKeyItem.value,
+            },
+          };
+        }
+      }
+
+      // Check for duplicate value within the same group if value or group is being updated
+      if (updateConfigItemDto.value || updateConfigItemDto.group) {
+        const group = updateConfigItemDto.group || configItem.group;
+        const value = updateConfigItemDto.value || configItem.value;
+
+        const existingValueItem = await this.configItemRepository.findOne({
+          where: { group, value },
+        });
+
+        if (existingValueItem && existingValueItem.id !== id) {
+          return {
+            success: false,
+            message: `${ERROR_MESSAGES.DUPLICATE_ENTRY}: Value already exists in this group`,
+            error: 'DUPLICATE_VALUE',
+            data: {
+              id,
+              group,
+              value,
+              existingId: existingValueItem.id,
+              existingKey: existingValueItem.key,
+            },
+          };
+        }
+      }
+
+      await this.configItemRepository.update(id, {
+        ...updateConfigItemDto,
+        updatedBy: userInfo?.email || userInfo?.name || 'system',
+      });
+      const updatedItem = await this.configItemRepository.findOne({
+        where: { id },
+      });
+      return {
+        success: true,
+        message: 'Config item updated successfully',
+        data: updatedItem,
+      };
+    } catch (error) {
+      console.error('Config update error:', error);
+      return {
+        success: false,
+        message: ERROR_MESSAGES.DATABASE_ERROR,
+        error: 'DATABASE_ERROR',
+        data: {
+          id,
+          updateData: updateConfigItemDto,
+          originalError: error.message,
+        },
+      };
+    }
   }
 
   async remove(id: number) {
-    const configItem = await this.configItemRepository.findOne({ where: { id } });
+    try {
+      const configItem = await this.configItemRepository.findOne({
+        where: { id },
+      });
 
-    if (!configItem) {
-      throw new NotFoundException(ERROR_MESSAGES.RECORD_NOT_FOUND);
+      if (!configItem) {
+        throw new NotFoundException({
+          message: ERROR_MESSAGES.RECORD_NOT_FOUND,
+          error: 'CONFIG_ITEM_NOT_FOUND',
+          data: { id },
+        });
+      }
+
+      await this.configItemRepository.remove(configItem);
+      return {
+        message: SUCCESS_MESSAGES.DELETED('Configuration item'),
+        data: {
+          id,
+          group: configItem.group,
+          key: configItem.key,
+        },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Config deletion error:', error);
+      throw new BadRequestException({
+        message: ERROR_MESSAGES.DATABASE_ERROR,
+        error: 'DATABASE_ERROR',
+        data: {
+          id,
+          originalError: error.message,
+        },
+      });
     }
-
-    await this.configItemRepository.remove(configItem);
-    return { message: SUCCESS_MESSAGES.DELETED('Configuration item') };
   }
 
   async findByGroup(group: string): Promise<ConfigItem[]> {
@@ -156,6 +341,42 @@ export class ConfigService {
     });
   }
 
+  async getMappings(): Promise<any> {
+    const locations = await this.getLocations();
+    const services = await this.getServices();
+
+    const locationMapping = locations.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {});
+
+    const serviceMapping = services.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {});
+
+    return {
+      locations: {
+        mapping: locationMapping,
+        options: locations.map((item) => ({
+          key: item.key,
+          value: item.value,
+          description: item.description,
+          order: item.order,
+        })),
+      },
+      services: {
+        mapping: serviceMapping,
+        options: services.map((item) => ({
+          key: item.key,
+          value: item.value,
+          description: item.description,
+          order: item.order,
+        })),
+      },
+    };
+  }
+
   async findByKey(group: string, key: string): Promise<ConfigItem | null> {
     return this.configItemRepository.findOne({
       where: { group, key },
@@ -169,6 +390,6 @@ export class ConfigService {
       .orderBy('config.group', 'ASC')
       .getRawMany();
 
-    return result.map(item => item.group);
+    return result.map((item) => item.group);
   }
 }

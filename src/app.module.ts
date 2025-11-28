@@ -24,17 +24,18 @@ import { ConfigController } from './controllers/config.controller';
 import { UserQuizSessionController } from './controllers/user-quiz-session.controller';
 import { AttemptAnswerController } from './controllers/attempt-answer.controller';
 import { UserQuizAssignmentController } from './controllers/user-quiz-assignment.controller';
+import { PublicController } from './controllers/public.controller';
 
 // Services
 import { QuizService } from './services/quiz.service';
 import { QuestionService } from './services/question.service';
 import { AttemptService } from './services/attempt.service';
-import { ConfigService } from './services/config.service';
 import { UrlShortenerService } from './services/url-shortener.service';
 import { UserQuizSessionService } from './services/user-quiz-session.service';
 import { AttemptAnswerService } from './services/attempt-answer.service';
 import { UserQuizAssignmentService } from './services/user-quiz-assignment.service';
 import { UrlGeneratorService } from './services/url-generator.service';
+import { FileUploadService } from './services/file-upload.service';
 
 // Shared Services Module
 import { SharedServicesModule } from './shared/shared-services.module';
@@ -83,17 +84,18 @@ import { databaseConfig } from './config/database.config';
     AttemptAnswerController,
     UserQuizAssignmentController,
     UserQuizSessionController,
+    PublicController,
   ],
   providers: [
     QuizService,
     QuestionService,
     AttemptService,
-    ConfigService,
     UrlShortenerService,
     AttemptAnswerService,
     UserQuizAssignmentService,
     UserQuizSessionService,
     UrlGeneratorService,
+    FileUploadService,
   ],
 })
 export class AppModule {}

@@ -1,11 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserQuizAssignment } from '../entities/user-quiz-assignment.entity';
 import { User } from '../entities/user.entity';
 import { Quiz } from '../entities/quiz.entity';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
-import { ApiResponse, ResponseFactory } from '../interfaces/api-response.interface';
+import {
+  ApiResponse,
+  ResponseFactory,
+} from '../interfaces/api-response.interface';
 
 export class CreateUserQuizAssignmentDto {
   userId: number;
@@ -37,37 +44,43 @@ export class UserQuizAssignmentService {
     private readonly quizRepository: Repository<Quiz>,
   ) {}
 
-  async create(createDto: CreateUserQuizAssignmentDto, assignedBy: string): Promise<UserQuizAssignmentResponseDto> {
+  async create(
+    createDto: CreateUserQuizAssignmentDto,
+    assignedBy: string,
+  ): Promise<UserQuizAssignmentResponseDto> {
     try {
       // Validate that user exists and is an admin
-      const user = await this.userRepository.findOne({ 
-        where: { id: createDto.userId } 
+      const user = await this.userRepository.findOne({
+        where: { id: createDto.userId },
       });
-      
+
       if (!user) {
         throw new NotFoundException('User not found');
       }
 
       if (user.role !== 'admin') {
-        throw new BadRequestException('Only admin users can be assigned to quizzes');
+        throw new BadRequestException(
+          'Only admin users can be assigned to quizzes',
+        );
       }
 
       // Validate that quiz exists
-      const quiz = await this.quizRepository.findOne({ 
-        where: { id: createDto.quizId } 
+      const quiz = await this.quizRepository.findOne({
+        where: { id: createDto.quizId },
       });
-      
+
       if (!quiz) {
         throw new NotFoundException('Quiz not found');
       }
 
       // Check if assignment already exists
-      const existingAssignment = await this.userQuizAssignmentRepository.findOne({
-        where: { 
-          userId: createDto.userId,
-          quizId: createDto.quizId 
-        }
-      });
+      const existingAssignment =
+        await this.userQuizAssignmentRepository.findOne({
+          where: {
+            userId: createDto.userId,
+            quizId: createDto.quizId,
+          },
+        });
 
       if (existingAssignment) {
         throw new BadRequestException('User is already assigned to this quiz');
@@ -81,7 +94,8 @@ export class UserQuizAssignmentService {
         assignedBy,
       });
 
-      const savedAssignment = await this.userQuizAssignmentRepository.save(assignment);
+      const savedAssignment =
+        await this.userQuizAssignmentRepository.save(assignment);
 
       // Return with user and quiz details
       const result = await this.userQuizAssignmentRepository.findOne({
@@ -117,16 +131,17 @@ export class UserQuizAssignmentService {
       whereCondition.isActive = isActive;
     }
 
-    const [assignments, total] = await this.userQuizAssignmentRepository.findAndCount({
-      where: whereCondition,
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-      relations: ['user', 'quiz'],
-    });
+    const [assignments, total] =
+      await this.userQuizAssignmentRepository.findAndCount({
+        where: whereCondition,
+        skip,
+        take: limit,
+        order: { createdAt: 'DESC' },
+        relations: ['user', 'quiz'],
+      });
 
     const totalPages = Math.ceil(total / limit);
-    
+
     return {
       items: assignments,
       pagination: {
@@ -136,7 +151,7 @@ export class UserQuizAssignmentService {
         totalItems: total,
         hasNext: page < totalPages,
         hasPrevious: page > 1,
-      }
+      },
     };
   }
 
@@ -153,18 +168,19 @@ export class UserQuizAssignmentService {
       whereCondition.isActive = isActive;
     }
 
-    const [assignments, total] = await this.userQuizAssignmentRepository.findAndCount({
-      where: whereCondition,
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-      relations: ['quiz', 'quiz.questions', 'quiz.location'],
-    });
+    const [assignments, total] =
+      await this.userQuizAssignmentRepository.findAndCount({
+        where: whereCondition,
+        skip,
+        take: limit,
+        order: { createdAt: 'DESC' },
+        relations: ['quiz', 'quiz.questions', 'quiz.location'],
+      });
 
     const totalPages = Math.ceil(total / limit);
-    
+
     return {
-      items: assignments.map(assignment => assignment.quiz),
+      items: assignments.map((assignment) => assignment.quiz),
       pagination: {
         currentPage: page,
         totalPages,
@@ -172,7 +188,7 @@ export class UserQuizAssignmentService {
         totalItems: total,
         hasNext: page < totalPages,
         hasPrevious: page > 1,
-      }
+      },
     };
   }
 
@@ -189,22 +205,23 @@ export class UserQuizAssignmentService {
       whereCondition.isActive = isActive;
     }
 
-    const [assignments, total] = await this.userQuizAssignmentRepository.findAndCount({
-      where: whereCondition,
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-      relations: ['user'],
-    });
+    const [assignments, total] =
+      await this.userQuizAssignmentRepository.findAndCount({
+        where: whereCondition,
+        skip,
+        take: limit,
+        order: { createdAt: 'DESC' },
+        relations: ['user'],
+      });
 
     const totalPages = Math.ceil(total / limit);
-    
+
     return {
-      items: assignments.map(assignment => ({
+      items: assignments.map((assignment) => ({
         assignmentId: assignment.id,
         assignedAt: assignment.createdAt,
         isActive: assignment.isActive,
-        user: assignment.user
+        user: assignment.user,
       })),
       pagination: {
         currentPage: page,
@@ -213,13 +230,13 @@ export class UserQuizAssignmentService {
         totalItems: total,
         hasNext: page < totalPages,
         hasPrevious: page > 1,
-      }
+      },
     };
   }
 
   async remove(id: number): Promise<void> {
     const assignment = await this.userQuizAssignmentRepository.findOne({
-      where: { id }
+      where: { id },
     });
 
     if (!assignment) {
@@ -229,13 +246,16 @@ export class UserQuizAssignmentService {
     await this.userQuizAssignmentRepository.remove(assignment);
   }
 
-  async findByUserAndQuiz(userId: number, quizId: number): Promise<UserQuizAssignment | null> {
+  async findByUserAndQuiz(
+    userId: number,
+    quizId: number,
+  ): Promise<UserQuizAssignment | null> {
     return this.userQuizAssignmentRepository.findOne({
-      where: { 
+      where: {
         userId,
         quizId,
-        isActive: true 
-      }
+        isActive: true,
+      },
     });
   }
 }

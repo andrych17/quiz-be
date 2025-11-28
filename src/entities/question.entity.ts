@@ -25,9 +25,9 @@ export class Question {
 
   @Column({
     type: 'enum',
-    enum: ['multiple-choice', 'multiple-select', 'text'],
+    enum: ['multiple-choice', 'multiple-select', 'text', 'true-false', 'essay'],
   })
-  questionType: 'multiple-choice' | 'multiple-select' | 'text';
+  questionType: 'multiple-choice' | 'multiple-select' | 'text' | 'true-false' | 'essay';
 
   @Column('jsonb', { nullable: true })
   options: string[];

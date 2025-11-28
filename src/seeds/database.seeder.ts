@@ -1,6 +1,15 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { User, Quiz, Question, Attempt, AttemptAnswer, ConfigItem, UserQuizAssignment, QuizImage } from '../entities';
+import {
+  User,
+  Quiz,
+  Question,
+  Attempt,
+  AttemptAnswer,
+  ConfigItem,
+  UserQuizAssignment,
+  QuizImage,
+} from '../entities';
 import { ServiceType } from '../dto/quiz.dto';
 
 export class DatabaseSeeder {
@@ -20,18 +29,20 @@ export class DatabaseSeeder {
 
   private async seedUsers(): Promise<void> {
     const userRepository = this.dataSource.getRepository(User);
-    
+
     // Check if users already exist
     const existingUsers = await userRepository.count();
     if (existingUsers > 0) {
-      console.log(`✓ Users already exist (${existingUsers} users), skipping seeding`);
+      console.log(
+        `✓ Users already exist (${existingUsers} users), skipping seeding`,
+      );
       return;
     }
-    
+
     // Hash passwords
     const saltRounds = 10;
     const defaultPassword = await bcrypt.hash('password123', saltRounds);
-    
+
     const users = [
       {
         email: 'superadmin@gms.com',
@@ -77,14 +88,16 @@ export class DatabaseSeeder {
 
   private async seedConfigItems(): Promise<void> {
     const configRepository = this.dataSource.getRepository(ConfigItem);
-    
+
     // Check if config items already exist
     const existingConfigs = await configRepository.count();
     if (existingConfigs > 0) {
-      console.log(`✓ Config items already exist (${existingConfigs} items), skipping seeding`);
+      console.log(
+        `✓ Config items already exist (${existingConfigs} items), skipping seeding`,
+      );
       return;
     }
-    
+
     const configs = [
       {
         group: 'app',
@@ -245,23 +258,28 @@ export class DatabaseSeeder {
     const quizRepository = this.dataSource.getRepository(Quiz);
     const questionRepository = this.dataSource.getRepository(Question);
     const configRepository = this.dataSource.getRepository(ConfigItem);
-    
+
     // Check if quizzes already exist
     const existingQuizzes = await quizRepository.count();
     if (existingQuizzes > 0) {
-      console.log(`✓ Quizzes already exist (${existingQuizzes} quizzes), skipping seeding`);
+      console.log(
+        `✓ Quizzes already exist (${existingQuizzes} quizzes), skipping seeding`,
+      );
       return;
     }
-    
+
     // Get locations
-    const locations = await configRepository.find({ where: { group: 'location' } });
-    const jakartaPusat = locations.find(l => l.key === 'jakarta_pusat');
-    const jakartaUtara = locations.find(l => l.key === 'jakarta_utara');
-    
+    const locations = await configRepository.find({
+      where: { group: 'location' },
+    });
+    const jakartaPusat = locations.find((l) => l.key === 'jakarta_pusat');
+    const jakartaUtara = locations.find((l) => l.key === 'jakarta_utara');
+
     // Quiz 1: Service Management
     const smQuiz = quizRepository.create({
       title: 'Test Masuk Service Management Batch 1',
-      description: 'Test untuk seleksi masuk tim Service Management batch 1. Test ini mencakup pemahaman ITIL, service desk, dan manajemen layanan IT.',
+      description:
+        'Test untuk seleksi masuk tim Service Management batch 1. Test ini mencakup pemahaman ITIL, service desk, dan manajemen layanan IT.',
       slug: 'test-sm-batch-1',
       token: 'sm-batch-1-2024',
       serviceType: ServiceType.SERVICE_MANAGEMENT,
@@ -281,7 +299,8 @@ export class DatabaseSeeder {
     // Quiz 2: Network Management
     const netQuiz = quizRepository.create({
       title: 'Test Network Management Batch 2',
-      description: 'Test untuk seleksi masuk tim Network Management batch 2. Test ini mencakup pemahaman jaringan, protokol, dan troubleshooting.',
+      description:
+        'Test untuk seleksi masuk tim Network Management batch 2. Test ini mencakup pemahaman jaringan, protokol, dan troubleshooting.',
       slug: 'test-network-batch-2',
       token: 'network-batch-2-2024',
       serviceType: ServiceType.NETWORK_MANAGEMENT,
@@ -306,26 +325,29 @@ export class DatabaseSeeder {
     const smQuestions = [
       {
         order: 1,
-        questionText: 'Apa yang dimaksud dengan Service Management dalam konteks IT?',
+        questionText:
+          'Apa yang dimaksud dengan Service Management dalam konteks IT?',
         questionType: 'multiple-choice' as const,
         options: [
           'Pengelolaan perangkat keras komputer',
           'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
           'Software untuk monitoring jaringan',
-          'Sistem keamanan IT'
+          'Sistem keamanan IT',
         ],
-        correctAnswer: 'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
+        correctAnswer:
+          'Pendekatan untuk mengelola layanan IT agar memberikan nilai kepada pelanggan',
         quizId: smQuizId,
       },
       {
         order: 2,
-        questionText: 'ITIL adalah framework yang digunakan dalam Service Management. Apa kepanjangan dari ITIL?',
+        questionText:
+          'ITIL adalah framework yang digunakan dalam Service Management. Apa kepanjangan dari ITIL?',
         questionType: 'multiple-choice' as const,
         options: [
           'Information Technology Infrastructure Library',
           'Internet Technology Integration Logic',
           'IT Implementation and Learning',
-          'Information Technical Integration Library'
+          'Information Technical Integration Library',
         ],
         correctAnswer: 'Information Technology Infrastructure Library',
         quizId: smQuizId,
@@ -338,7 +360,7 @@ export class DatabaseSeeder {
           'Service Strategy',
           'Service Design',
           'Service Operation',
-          'Service Development'
+          'Service Development',
         ],
         correctAnswer: 'Service Development',
         quizId: smQuizId,
@@ -353,7 +375,7 @@ export class DatabaseSeeder {
           'Redis',
           'PostgreSQL',
           'Cassandra',
-          'CouchDB'
+          'CouchDB',
         ],
         correctAnswer: 'MongoDB,Redis,Cassandra,CouchDB',
         quizId: smQuizId,
@@ -368,9 +390,10 @@ export class DatabaseSeeder {
           'SaaS (Software as a Service)',
           'DaaS (Desktop as a Service)',
           'BaaS (Backend as a Service)',
-          'NaaS (Network as a Service)'
+          'NaaS (Network as a Service)',
         ],
-        correctAnswer: 'IaaS (Infrastructure as a Service),PaaS (Platform as a Service),SaaS (Software as a Service)',
+        correctAnswer:
+          'IaaS (Infrastructure as a Service),PaaS (Platform as a Service),SaaS (Software as a Service)',
         quizId: smQuizId,
       },
     ];
@@ -384,9 +407,10 @@ export class DatabaseSeeder {
           'Cara perangkat jaringan dihubungkan secara fisik dan logis',
           'Software untuk monitoring jaringan',
           'Protocol komunikasi jaringan',
-          'Jenis kabel jaringan'
+          'Jenis kabel jaringan',
         ],
-        correctAnswer: 'Cara perangkat jaringan dihubungkan secara fisik dan logis',
+        correctAnswer:
+          'Cara perangkat jaringan dihubungkan secara fisik dan logis',
         quizId: netQuizId,
       },
       {
@@ -399,9 +423,10 @@ export class DatabaseSeeder {
           'Network Layer',
           'Session Layer',
           'Application Layer',
-          'Security Layer'
+          'Security Layer',
         ],
-        correctAnswer: 'Physical Layer,Data Link Layer,Network Layer,Session Layer,Application Layer',
+        correctAnswer:
+          'Physical Layer,Data Link Layer,Network Layer,Session Layer,Application Layer',
         quizId: netQuizId,
       },
       {
@@ -409,7 +434,8 @@ export class DatabaseSeeder {
         questionText: 'Apa fungsi utama dari Router?',
         questionType: 'text' as const,
         options: undefined,
-        correctAnswer: 'menghubungkan jaringan yang berbeda dan menentukan jalur terbaik untuk pengiriman data',
+        correctAnswer:
+          'menghubungkan jaringan yang berbeda dan menentukan jalur terbaik untuk pengiriman data',
         quizId: netQuizId,
       },
       {
@@ -423,24 +449,32 @@ export class DatabaseSeeder {
     ];
 
     await questionRepository.save([...smQuestions, ...netQuestions]);
-    
-    console.log(`✓ Seeded 2 quizzes with ${smQuestions.length + netQuestions.length} questions`);
+
+    console.log(
+      `✓ Seeded 2 quizzes with ${smQuestions.length + netQuestions.length} questions`,
+    );
   }
 
   private async seedAttempts(): Promise<void> {
     const attemptRepository = this.dataSource.getRepository(Attempt);
     const quizRepository = this.dataSource.getRepository(Quiz);
-    
+
     // Check if attempts already exist
     const existingAttempts = await attemptRepository.count();
     if (existingAttempts > 0) {
-      console.log(`✓ Attempts already exist (${existingAttempts} attempts), skipping seeding`);
+      console.log(
+        `✓ Attempts already exist (${existingAttempts} attempts), skipping seeding`,
+      );
       return;
     }
-    
-    const smQuiz = await quizRepository.findOne({ where: { slug: 'test-sm-batch-1' } });
-    const netQuiz = await quizRepository.findOne({ where: { slug: 'test-network-batch-2' } });
-    
+
+    const smQuiz = await quizRepository.findOne({
+      where: { slug: 'test-sm-batch-1' },
+    });
+    const netQuiz = await quizRepository.findOne({
+      where: { slug: 'test-network-batch-2' },
+    });
+
     if (!smQuiz || !netQuiz) {
       console.log('❌ Quizzes not found for seeding attempts');
       return;
