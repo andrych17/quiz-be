@@ -52,12 +52,17 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.APP_PORT || 3001;
-  await app.listen(port);
+  const port = process.env.PORT || process.env.APP_PORT || 3001;
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`Application is running on: ${APP_URLS.BACKEND_URL}`);
-  console.log(`Frontend URL: ${APP_URLS.FRONTEND_URL}`);
-  console.log(`API Base URL: ${APP_URLS.API_BASE_URL}`);
-  console.log(`Swagger Documentation: ${APP_URLS.BACKEND_URL}/api/docs`);
+  console.log(`Application is running on port: ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Only log URLs in development
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`Frontend URL: ${APP_URLS.FRONTEND_URL}`);
+    console.log(`API Base URL: ${APP_URLS.API_BASE_URL}`);
+    console.log(`Swagger Documentation: ${APP_URLS.BACKEND_URL}/api/docs`);
+  }
 }
 bootstrap();

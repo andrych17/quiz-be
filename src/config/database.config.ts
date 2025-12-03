@@ -40,6 +40,9 @@ export const databaseConfig = registerAs(
     logging: process.env.DATABASE_LOGGING === 'true' || false,
     migrationsRun: true,
     autoLoadEntities: true,
+    ssl: process.env.DATABASE_SSL === 'true' ? {
+      rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'
+    } : false,
   }),
 );
 
@@ -55,6 +58,9 @@ export const dataSourceConfig: DataSourceOptions = {
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
   logging: process.env.DATABASE_LOGGING === 'true' || false,
+  ssl: process.env.DATABASE_SSL === 'true' ? {
+    rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false'
+  } : false,
 };
 
 export const dataSource = new DataSource(dataSourceConfig);
